@@ -60,19 +60,19 @@ export async function POST(request: NextRequest) {
       user: userData,
       message: 'User created successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Registration error:', error);
     console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      code: error.code,
-      stack: error.stack
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      code: (error as { code?: string })?.code,
+      stack: error instanceof Error ? error.stack : undefined
     });
     
     return NextResponse.json(
       { 
         error: 'Internal server error',
-        details: error.message 
+        details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );

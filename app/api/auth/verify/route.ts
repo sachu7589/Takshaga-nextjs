@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getTokenFromCookies, verifyToken } from '@/app/lib/auth';
 import dbConnect from '@/app/lib/db';
 import User from '@/app/models/User';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const token = await getTokenFromCookies();
     
