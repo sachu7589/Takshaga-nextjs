@@ -163,7 +163,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                className="lg:hidden p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all cursor-pointer"
               >
                 <Menu className="h-6 w-6" />
               </button>
@@ -175,11 +175,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <button className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all relative">
+              <button className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all cursor-pointer relative">
                 <Bell className="h-5 w-5" />
                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>
               </button>
-              <button className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
+              <button className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all cursor-pointer">
                 <Settings className="h-5 w-5" />
               </button>
               <div className="w-px h-6 bg-gray-300"></div>

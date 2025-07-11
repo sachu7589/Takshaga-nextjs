@@ -250,13 +250,13 @@ export default function ClientsPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
-                      <button className="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-all">
+                      <button className="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-all cursor-pointer">
                         <Edit className="h-4 w-4" />
                       </button>
-                      <button className="p-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition-all">
+                      <button className="p-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition-all cursor-pointer">
                         <Trash2 className="h-4 w-4" />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-all">
+                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-all cursor-pointer">
                         <MoreVertical className="h-4 w-4" />
                       </button>
                     </div>
