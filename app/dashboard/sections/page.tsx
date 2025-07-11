@@ -3,56 +3,17 @@
 import { useState, useRef, useEffect } from "react";
 import Swal from "sweetalert2";
 import { 
-  FolderOpen, 
-  Plus, 
   Search, 
   Edit, 
   Trash2,
-  Calendar,
-  Users,
-  FileText,
   Filter,
-  MoreVertical,
-  TrendingUp,
-  Sparkles,
   X,
   Tag,
   Layers,
   Package
 } from "lucide-react";
 
-interface Section {
-  id: string;
-  name: string;
-  description: string;
-  clientCount: number;
-  projectCount: number;
-  status: 'active' | 'archived';
-  createdAt: string;
-  lastUpdated: string;
-  priority?: 'high' | 'medium' | 'low';
-}
 
-interface Category {
-  id: string;
-  name: string;
-}
-
-interface SubCategory {
-  id: string;
-  name: string;
-  categoryId: string;
-}
-
-interface SectionItem {
-  id: string;
-  categoryId: string;
-  subCategoryId: string;
-  material: string;
-  description: string;
-  amount: number;
-  type: 'pieces' | 'area' | 'running_sq_feet';
-}
 
 export default function SectionsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -84,11 +45,11 @@ export default function SectionsPage() {
   });
   
   // Refs for input fields
-  const categoryInputRef = useRef<HTMLInputElement>(null);
-  const subCategoryInputRef = useRef<HTMLInputElement>(null);
-  const materialInputRef = useRef<HTMLInputElement>(null);
-  const amountInputRef = useRef<HTMLInputElement>(null);
-  const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
+  const categoryInputRef = useRef<HTMLInputElement>(null!);
+  const subCategoryInputRef = useRef<HTMLInputElement>(null!);
+  const materialInputRef = useRef<HTMLInputElement>(null!);
+  const amountInputRef = useRef<HTMLInputElement>(null!);
+  const descriptionInputRef = useRef<HTMLTextAreaElement>(null!);
   
   // Form states
   const [categoryForm, setCategoryForm] = useState({ name: "" });
@@ -113,20 +74,6 @@ export default function SectionsPage() {
   const [loading, setLoading] = useState(false);
 
   // Remove dummy sections data - we'll use sectionsData from database instead
-
-  const filteredSections = sectionsData.filter(section =>
-    section.material.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    section.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -278,12 +225,12 @@ export default function SectionsPage() {
   };
 
   // Edit functions
-  const handleEditCategory = (category: any) => {
+  const handleEditCategory = (category: { id: string; name: string }) => {
     setEditCategoryForm({ id: category.id, name: category.name });
     setShowEditCategoryModal(true);
   };
 
-  const handleEditSubCategory = (subCategory: any) => {
+  const handleEditSubCategory = (subCategory: { id: string; categoryId: string; name: string }) => {
     setEditSubCategoryForm({ 
       id: subCategory.id, 
       categoryId: subCategory.categoryId, 
@@ -292,7 +239,7 @@ export default function SectionsPage() {
     setShowEditSubCategoryModal(true);
   };
 
-  const handleEditSection = (section: any) => {
+  const handleEditSection = (section: { id: string; categoryId: string; subCategoryId: string; material: string; description: string; amount: number; type: string }) => {
     setEditSectionForm({
       id: section.id,
       categoryId: section.categoryId,
@@ -300,7 +247,7 @@ export default function SectionsPage() {
       material: section.material,
       description: section.description,
       amount: section.amount.toString(),
-      type: section.type
+      type: section.type as 'pieces' | 'area' | 'running_sq_feet'
     });
     setShowEditSectionModal(true);
     // Fetch subcategories for the selected category
@@ -504,7 +451,7 @@ export default function SectionsPage() {
 
   const handleInputChange = (
     value: string, 
-    setter: (value: any) => void, 
+    setter: (value: string) => void, 
     ref?: React.RefObject<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     setter(value);

@@ -44,10 +44,10 @@ const Section = mongoose.models.Section || mongoose.model('Section', sectionSche
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { name, categoryId, subCategoryId, material, description, amount, type } = await request.json();
 
     if (!name || !categoryId || !subCategoryId || !material || !description || !amount || !type) {
@@ -92,10 +92,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     await dbConnect();
 
     const result = await Section.deleteOne({ _id: id });
