@@ -8,7 +8,6 @@ import {
   FolderOpen, 
   LogOut, 
   Menu,
-  X,
   User,
   Settings,
   Bell
