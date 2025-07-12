@@ -435,9 +435,22 @@ export default function SectionsPage() {
 
   // Load data on component mount
   useEffect(() => {
-    fetchCategories();
-    fetchSubCategories();
-    fetchSections();
+    setLoading(true);
+    Promise.all([
+      fetch('/api/categories').then(r => r.json()),
+      fetch('/api/subcategories').then(r => r.json()),
+      fetch('/api/sections').then(r => r.json())
+    ])
+      .then(([catRes, subRes, secRes]) => {
+        if (catRes.success) setCategories(catRes.categories);
+        if (subRes.success) setSubCategories(subRes.subCategories);
+        if (secRes.success) setSectionsData(secRes.sections);
+      })
+      .catch((err) => {
+        // Optionally set an error state here
+        console.error('Error loading data:', err);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   // Focus management functions
