@@ -10,7 +10,8 @@ import {
   Menu,
   User,
   Settings,
-  Bell
+  Bell,
+  Palette
 } from "lucide-react";
 import Image from "next/image";
 
@@ -86,13 +87,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       name: "Clients",
       icon: Users,
       href: "/dashboard/clients",
-      active: pathname === "/dashboard/clients"
+      active: pathname === "/dashboard/clients" || pathname.startsWith("/dashboard/estimates")
     },
     {
       name: "Sections",
       icon: FolderOpen,
       href: "/dashboard/sections",
       active: pathname === "/dashboard/sections"
+    },
+    {
+      name: "Interior Presets",
+      icon: Palette,
+      href: "/dashboard/interior-presets",
+      active: pathname === "/dashboard/interior-presets" || pathname.startsWith("/dashboard/interior-presets")
     }
   ];
 
