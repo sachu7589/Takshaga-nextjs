@@ -194,7 +194,6 @@ export default function SectionsPage() {
 
   // Fetch categories from database with enhanced error handling
   const fetchCategories = async () => {
-    setLoadingStates(prev => ({ ...prev, categories: true }));
     try {
       const data = await fetchWithRetry('/api/categories');
       if (data.success) {
@@ -206,14 +205,11 @@ export default function SectionsPage() {
     } catch (error) {
       console.error('Error fetching categories:', error);
       setError('Failed to load categories. Please try again.');
-    } finally {
-      setLoadingStates(prev => ({ ...prev, categories: false }));
     }
   };
 
   // Fetch sub-categories from database with enhanced error handling
   const fetchSubCategories = async (categoryId?: string) => {
-    setLoadingStates(prev => ({ ...prev, subCategories: true }));
     try {
       const url = categoryId 
         ? `/api/subcategories?categoryId=${categoryId}`
@@ -228,8 +224,6 @@ export default function SectionsPage() {
     } catch (error) {
       console.error('Error fetching subcategories:', error);
       setError('Failed to load subcategories. Please try again.');
-    } finally {
-      setLoadingStates(prev => ({ ...prev, subCategories: false }));
     }
   };
 
@@ -249,7 +243,6 @@ export default function SectionsPage() {
 
   // Fetch sections from database with enhanced error handling
   const fetchSections = async () => {
-    setLoadingStates(prev => ({ ...prev, sections: true }));
     try {
       const data = await fetchWithRetry('/api/sections');
       if (data.success) {
@@ -261,8 +254,6 @@ export default function SectionsPage() {
     } catch (error) {
       console.error('Error fetching sections:', error);
       setError('Failed to load sections. Please try again.');
-    } finally {
-      setLoadingStates(prev => ({ ...prev, sections: false }));
     }
   };
 
@@ -278,38 +269,35 @@ export default function SectionsPage() {
     });
     
     try {
-      // Fetch all data in parallel with individual error handling
-      const results = await Promise.allSettled([
+      console.log('Starting to fetch all data...');
+      
+      // Fetch all data in parallel
+      const [catResponse, subResponse, secResponse] = await Promise.all([
         fetchWithRetry('/api/categories'),
         fetchWithRetry('/api/subcategories'),
         fetchWithRetry('/api/sections')
       ]);
 
-      const [catResult, subResult, secResult] = results;
+      console.log('All data fetched successfully');
 
-      // Handle each result individually
-      if (catResult.status === 'fulfilled' && catResult.value.success) {
-        setCategories(catResult.value.categories);
-      } else {
-        console.error('Categories fetch failed:', catResult);
+      // Set all data at once
+      if (catResponse.success) {
+        setCategories(catResponse.categories);
+        console.log('Categories loaded:', catResponse.categories.length);
       }
 
-      if (subResult.status === 'fulfilled' && subResult.value.success) {
-        setSubCategories(subResult.value.subCategories);
-      } else {
-        console.error('Subcategories fetch failed:', subResult);
+      if (subResponse.success) {
+        setSubCategories(subResponse.subCategories);
+        console.log('Subcategories loaded:', subResponse.subCategories.length);
       }
 
-      if (secResult.status === 'fulfilled' && secResult.value.success) {
-        setSectionsData(secResult.value.sections);
-      } else {
-        console.error('Sections fetch failed:', secResult);
+      if (secResponse.success) {
+        setSectionsData(secResponse.sections);
+        console.log('Sections loaded:', secResponse.sections.length);
       }
 
       // Check if any data was loaded successfully
-      const hasData = (catResult.status === 'fulfilled' && catResult.value.success) ||
-                     (subResult.status === 'fulfilled' && subResult.value.success) ||
-                     (secResult.status === 'fulfilled' && secResult.value.success);
+      const hasData = catResponse.success || subResponse.success || secResponse.success;
 
       if (!hasData) {
         setError('Unable to load data. This might be due to a cold start. Please try refreshing the page.');
@@ -317,6 +305,7 @@ export default function SectionsPage() {
       } else {
         setError(null);
         setRetryCount(0);
+        console.log('All data loaded successfully');
       }
 
     } catch (error) {
@@ -324,12 +313,13 @@ export default function SectionsPage() {
       setError('Failed to load data. Please check your connection and try again.');
       setRetryCount(prev => prev + 1);
     } finally {
-      // Set all loading states to false
+      // Set all loading states to false at the same time
       setLoadingStates({
         categories: false,
         subCategories: false,
         sections: false
       });
+      console.log('Loading states set to false');
     }
   };
 
@@ -338,10 +328,60 @@ export default function SectionsPage() {
     loadAllData();
   };
 
-  // Load data on component mount
+  // Force refresh function for tab changes
+  const handleForceRefresh = () => {
+    console.log('Force refreshing data...');
+    loadAllData();
+  };
+
+  // Load data on component mount and handle tab focus
   useEffect(() => {
     loadAllData();
-  }, []);
+    
+    // Handle tab focus and visibility change to refresh data when user comes back to the tab
+    const handleTabFocus = () => {
+      console.log('Tab focused, checking if data needs refresh...');
+      // Only refresh if we have no data
+      if (categories.length === 0 && subCategories.length === 0 && sectionsData.length === 0) {
+        console.log('No data found, refreshing...');
+        loadAllData();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('Page became visible, checking if data needs refresh...');
+        // Only refresh if we have no data
+        if (categories.length === 0 && subCategories.length === 0 && sectionsData.length === 0) {
+          console.log('No data found, refreshing...');
+          loadAllData();
+        }
+      }
+    };
+
+    // Periodic check to ensure data is loaded (every 10 seconds for the first minute)
+    const checkInterval = setInterval(() => {
+      if (categories.length === 0 && subCategories.length === 0 && sectionsData.length === 0) {
+        console.log('Periodic check: No data found, refreshing...');
+        loadAllData();
+      }
+    }, 10000);
+
+    // Clear interval after 1 minute
+    const clearCheckInterval = setTimeout(() => {
+      clearInterval(checkInterval);
+    }, 60000);
+
+    window.addEventListener('focus', handleTabFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('focus', handleTabFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(checkInterval);
+      clearTimeout(clearCheckInterval);
+    };
+  }, [categories.length, subCategories.length, sectionsData.length]);
 
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -749,6 +789,13 @@ export default function SectionsPage() {
         </div>
         <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-3">
           <button 
+            onClick={handleForceRefresh}
+            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 shadow-lg hover:shadow-xl cursor-pointer"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </button>
+          <button 
             onClick={() => setShowCategoryModal(true)}
             className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl cursor-pointer"
           >
@@ -1153,7 +1200,12 @@ export default function SectionsPage() {
             )}
 
               {/* Sub Categories */}
-              {filteredSubCategories.map((subCategory) => (
+              {loadingStates.subCategories ? (
+                Array.from({ length: 3 }).map((_, index) => (
+                  <SubCategorySkeleton key={`sub-${index}`} />
+                ))
+              ) : (
+                filteredSubCategories.map((subCategory) => (
                 <div key={subCategory.id} className="group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20 overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-600"></div>
                   <div className="p-6">
@@ -1199,10 +1251,16 @@ export default function SectionsPage() {
                     
                   </div>
                 </div>
-              ))}
+              ))
+            )}
 
               {/* Sections */}
-              {filteredSectionsData.map((section) => (
+              {loadingStates.sections ? (
+                Array.from({ length: 3 }).map((_, index) => (
+                  <SectionSkeleton key={`sec-${index}`} />
+                ))
+              ) : (
+                filteredSectionsData.map((section) => (
                 <div key={section.id} className="group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20 overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
                   <div className="p-6">
@@ -1269,7 +1327,8 @@ export default function SectionsPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+              ))
+            )}
             </div>
           )}
         </div>
