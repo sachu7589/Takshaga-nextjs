@@ -10,10 +10,85 @@ import {
   X,
   Tag,
   Layers,
-  Package
+  Package,
+  Loader2,
+  RefreshCw,
+  AlertCircle
 } from "lucide-react";
 
+// Loading skeleton components
+const CategorySkeleton = () => (
+  <div className="group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg border border-white/20 overflow-hidden animate-pulse">
+    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-emerald-600"></div>
+    <div className="p-6">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-12 h-12 bg-gray-300 rounded-xl"></div>
+          <div>
+            <div className="h-6 bg-gray-300 rounded w-32 mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-20"></div>
+          </div>
+        </div>
+        <div className="flex space-x-2">
+          <div className="w-8 h-8 bg-gray-300 rounded"></div>
+          <div className="w-8 h-8 bg-gray-300 rounded"></div>
+        </div>
+      </div>
+      <div className="h-16 bg-gray-200 rounded-lg"></div>
+    </div>
+  </div>
+);
 
+const SubCategorySkeleton = () => (
+  <div className="group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg border border-white/20 overflow-hidden animate-pulse">
+    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-600"></div>
+    <div className="p-6">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-12 h-12 bg-gray-300 rounded-xl"></div>
+          <div>
+            <div className="h-6 bg-gray-300 rounded w-32 mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-20"></div>
+          </div>
+        </div>
+        <div className="flex space-x-2">
+          <div className="w-8 h-8 bg-gray-300 rounded"></div>
+          <div className="w-8 h-8 bg-gray-300 rounded"></div>
+        </div>
+      </div>
+      <div className="h-16 bg-gray-200 rounded-lg"></div>
+    </div>
+  </div>
+);
+
+const SectionSkeleton = () => (
+  <div className="group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg border border-white/20 overflow-hidden animate-pulse">
+    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+    <div className="p-6">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-12 h-12 bg-gray-300 rounded-xl"></div>
+          <div>
+            <div className="h-6 bg-gray-300 rounded w-32 mb-2"></div>
+            <div className="flex space-x-2">
+              <div className="h-4 bg-gray-200 rounded w-16"></div>
+              <div className="h-4 bg-gray-200 rounded w-12"></div>
+            </div>
+          </div>
+        </div>
+        <div className="flex space-x-2">
+          <div className="w-8 h-8 bg-gray-300 rounded"></div>
+          <div className="w-8 h-8 bg-gray-300 rounded"></div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="h-12 bg-gray-200 rounded-lg"></div>
+        <div className="h-12 bg-gray-200 rounded-lg"></div>
+      </div>
+      <div className="h-4 bg-gray-200 rounded w-24"></div>
+    </div>
+  </div>
+);
 
 export default function SectionsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -71,9 +146,205 @@ export default function SectionsPage() {
   const [subCategories, setSubCategories] = useState<Array<{id: string, categoryId: string, name: string}>>([]);
   const [subCategoriesForCategory, setSubCategoriesForCategory] = useState<Array<{id: string, categoryId: string, name: string}>>([]);
   const [sectionsData, setSectionsData] = useState<Array<{id: string, categoryId: string, subCategoryId: string, material: string, description: string, amount: number, type: string}>>([]);
+  
+  // Loading and error states
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadingStates, setLoadingStates] = useState({
+    categories: false,
+    subCategories: false,
+    sections: false
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Remove dummy sections data - we'll use sectionsData from database instead
+
+  // Enhanced fetch function with retry logic
+  const fetchWithRetry = async (url: string, options: RequestInit = {}, maxRetries = 3) => {
+    let lastError: Error;
+    
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const response = await fetch(url, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        lastError = error as Error;
+        console.warn(`Attempt ${i + 1} failed for ${url}:`, error);
+        
+        if (i < maxRetries - 1) {
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+        }
+      }
+    }
+    
+    throw lastError!;
+  };
+
+  // Fetch categories from database with enhanced error handling
+  const fetchCategories = async () => {
+    setLoadingStates(prev => ({ ...prev, categories: true }));
+    try {
+      const data = await fetchWithRetry('/api/categories');
+      if (data.success) {
+        setCategories(data.categories);
+        setError(null);
+      } else {
+        throw new Error(data.error || 'Failed to fetch categories');
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      setError('Failed to load categories. Please try again.');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, categories: false }));
+    }
+  };
+
+  // Fetch sub-categories from database with enhanced error handling
+  const fetchSubCategories = async (categoryId?: string) => {
+    setLoadingStates(prev => ({ ...prev, subCategories: true }));
+    try {
+      const url = categoryId 
+        ? `/api/subcategories?categoryId=${categoryId}`
+        : '/api/subcategories';
+      const data = await fetchWithRetry(url);
+      if (data.success) {
+        setSubCategories(data.subCategories);
+        setError(null);
+      } else {
+        throw new Error(data.error || 'Failed to fetch subcategories');
+      }
+    } catch (error) {
+      console.error('Error fetching subcategories:', error);
+      setError('Failed to load subcategories. Please try again.');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, subCategories: false }));
+    }
+  };
+
+  // Fetch sub-categories for a specific category (for edit modals)
+  const fetchSubCategoriesForCategory = async (categoryId: string) => {
+    try {
+      const data = await fetchWithRetry(`/api/subcategories?categoryId=${categoryId}`);
+      if (data.success) {
+        setSubCategoriesForCategory(data.subCategories);
+      } else {
+        throw new Error(data.error || 'Failed to fetch subcategories for category');
+      }
+    } catch (error) {
+      console.error('Error fetching subcategories for category:', error);
+    }
+  };
+
+  // Fetch sections from database with enhanced error handling
+  const fetchSections = async () => {
+    setLoadingStates(prev => ({ ...prev, sections: true }));
+    try {
+      const data = await fetchWithRetry('/api/sections');
+      if (data.success) {
+        setSectionsData(data.sections);
+        setError(null);
+      } else {
+        throw new Error(data.error || 'Failed to fetch sections');
+      }
+    } catch (error) {
+      console.error('Error fetching sections:', error);
+      setError('Failed to load sections. Please try again.');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, sections: false }));
+    }
+  };
+
+  // Load all data with proper error handling and retry logic
+  const loadAllData = async () => {
+    setInitialLoading(true);
+    setError(null);
+    
+    try {
+      // Show loading message to user
+      Swal.fire({
+        title: 'Loading Data...',
+        text: 'Please wait while we fetch your data from the database',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // Fetch all data in parallel with individual error handling
+      const results = await Promise.allSettled([
+        fetchWithRetry('/api/categories'),
+        fetchWithRetry('/api/subcategories'),
+        fetchWithRetry('/api/sections')
+      ]);
+
+      const [catResult, subResult, secResult] = results;
+
+      // Handle each result individually
+      if (catResult.status === 'fulfilled' && catResult.value.success) {
+        setCategories(catResult.value.categories);
+      } else {
+        console.error('Categories fetch failed:', catResult);
+      }
+
+      if (subResult.status === 'fulfilled' && subResult.value.success) {
+        setSubCategories(subResult.value.subCategories);
+      } else {
+        console.error('Subcategories fetch failed:', subResult);
+      }
+
+      if (secResult.status === 'fulfilled' && secResult.value.success) {
+        setSectionsData(secResult.value.sections);
+      } else {
+        console.error('Sections fetch failed:', secResult);
+      }
+
+      // Check if any data was loaded successfully
+      const hasData = (catResult.status === 'fulfilled' && catResult.value.success) ||
+                     (subResult.status === 'fulfilled' && subResult.value.success) ||
+                     (secResult.status === 'fulfilled' && secResult.value.success);
+
+      if (!hasData) {
+        setError('Unable to load data. This might be due to a cold start. Please try refreshing the page.');
+        setRetryCount(prev => prev + 1);
+      } else {
+        setError(null);
+        setRetryCount(0);
+      }
+
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setError('Failed to load data. Please check your connection and try again.');
+      setRetryCount(prev => prev + 1);
+    } finally {
+      setInitialLoading(false);
+      Swal.close();
+    }
+  };
+
+  // Retry function
+  const handleRetry = () => {
+    loadAllData();
+  };
+
+  // Load data on component mount
+  useEffect(() => {
+    loadAllData();
+  }, []);
 
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -345,61 +616,6 @@ export default function SectionsPage() {
     }
   };
 
-  // Fetch categories from database
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch('/api/categories');
-      const data = await response.json();
-      if (data.success) {
-        setCategories(data.categories);
-      }
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-    }
-  };
-
-  // Fetch sub-categories from database
-  const fetchSubCategories = async (categoryId?: string) => {
-    try {
-      const url = categoryId 
-        ? `/api/subcategories?categoryId=${categoryId}`
-        : '/api/subcategories';
-      const response = await fetch(url);
-      const data = await response.json();
-      if (data.success) {
-        setSubCategories(data.subCategories);
-      }
-    } catch (error) {
-      console.error('Error fetching subcategories:', error);
-    }
-  };
-
-  // Fetch sub-categories for a specific category (for edit modals)
-  const fetchSubCategoriesForCategory = async (categoryId: string) => {
-    try {
-      const response = await fetch(`/api/subcategories?categoryId=${categoryId}`);
-      const data = await response.json();
-      if (data.success) {
-        setSubCategoriesForCategory(data.subCategories);
-      }
-    } catch (error) {
-      console.error('Error fetching subcategories for category:', error);
-    }
-  };
-
-  // Fetch sections from database
-  const fetchSections = async () => {
-    try {
-      const response = await fetch('/api/sections');
-      const data = await response.json();
-      if (data.success) {
-        setSectionsData(data.sections);
-      }
-    } catch (error) {
-      console.error('Error fetching sections:', error);
-    }
-  };
-
   // Get filtered sub-categories based on selected category
   const getFilteredSubCategories = (categoryId: string) => {
     return subCategories.filter(sub => sub.categoryId === categoryId);
@@ -432,26 +648,6 @@ export default function SectionsPage() {
     getCategoryName(section.categoryId).toLowerCase().includes(searchTerm.toLowerCase()) ||
     getSubCategoryName(section.subCategoryId).toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  // Load data on component mount
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      fetch('/api/categories').then(r => r.json()),
-      fetch('/api/subcategories').then(r => r.json()),
-      fetch('/api/sections').then(r => r.json())
-    ])
-      .then(([catRes, subRes, secRes]) => {
-        if (catRes.success) setCategories(catRes.categories);
-        if (subRes.success) setSubCategories(subRes.subCategories);
-        if (secRes.success) setSectionsData(secRes.sections);
-      })
-      .catch((err) => {
-        // Optionally set an error state here
-        console.error('Error loading data:', err);
-      })
-      .finally(() => setLoading(false));
-  }, []);
 
   // Focus management functions
   const handleInputFocus = (ref: React.RefObject<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -579,6 +775,44 @@ export default function SectionsPage() {
         </div>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 shadow-lg">
+          <div className="flex items-center space-x-3">
+            <AlertCircle className="h-6 w-6 text-red-600" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-red-800">Error Loading Data</h3>
+              <p className="text-red-700 mt-1">{error}</p>
+              {retryCount > 0 && (
+                <p className="text-sm text-red-600 mt-2">
+                  This might be due to a cold start. Retry attempt: {retryCount}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleRetry}
+              className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all duration-200"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {initialLoading && (
+        <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-8 shadow-lg border border-white/20">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-900">Loading Data</h3>
+              <p className="text-gray-600 mt-1">Please wait while we fetch your data from the database...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search and Filters */}
       <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg border border-white/20 p-6">
         <div className="flex flex-col sm:flex-row gap-4">
@@ -663,178 +897,194 @@ export default function SectionsPage() {
           
           {selectedFilter === 'category' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCategories.map((category) => (
-                <div key={category.id} className="group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20 overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-emerald-600"></div>
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                          <Tag className="h-6 w-6 text-white" />
+              {loadingStates.categories ? (
+                // Show skeleton loaders while loading
+                Array.from({ length: 6 }).map((_, index) => (
+                  <CategorySkeleton key={index} />
+                ))
+              ) : (
+                filteredCategories.map((category) => (
+                  <div key={category.id} className="group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20 overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-emerald-600"></div>
+                    <div className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+                            <Tag className="h-6 w-6 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">{category.name}</h3>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                Category
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-900">{category.name}</h3>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                              Category
-                            </span>
+                        <div className="flex space-x-1">
+                          <button 
+                            onClick={() => handleEditCategory(category)}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteCategory(category.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 gap-4 mb-4">
+                        <div className="flex items-center space-x-2 p-3 bg-white/50 rounded-lg">
+                          <Layers className="h-4 w-4 text-purple-600" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Sub Categories</p>
+                            <p className="text-xs text-gray-500">{subCategories.filter(sub => sub.categoryId === category.id).length} items</p>
                           </div>
                         </div>
                       </div>
-                      <div className="flex space-x-1">
-                        <button 
-                          onClick={() => handleEditCategory(category)}
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteCategory(category.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      
                     </div>
-                    
-                    <div className="grid grid-cols-1 gap-4 mb-4">
-                      <div className="flex items-center space-x-2 p-3 bg-white/50 rounded-lg">
-                        <Layers className="h-4 w-4 text-purple-600" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Sub Categories</p>
-                          <p className="text-xs text-gray-500">{subCategories.filter(sub => sub.categoryId === category.id).length} items</p>
-                        </div>
-                      </div>
-                    </div>
-                    
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
 
           {selectedFilter === 'subcategory' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredSubCategories.map((subCategory) => (
-                <div key={subCategory.id} className="group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20 overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-600"></div>
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-                          <Layers className="h-6 w-6 text-white" />
+              {loadingStates.subCategories ? (
+                Array.from({ length: 6 }).map((_, index) => (
+                  <SubCategorySkeleton key={index} />
+                ))
+              ) : (
+                filteredSubCategories.map((subCategory) => (
+                  <div key={subCategory.id} className="group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20 overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-600"></div>
+                    <div className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+                            <Layers className="h-6 w-6 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">{subCategory.name}</h3>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                                Sub Category
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-900">{subCategory.name}</h3>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
-                              Sub Category
-                            </span>
+                        <div className="flex space-x-1">
+                          <button 
+                            onClick={() => handleEditSubCategory(subCategory)}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteSubCategory(subCategory.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 gap-4 mb-4">
+                        <div className="flex items-center space-x-2 p-3 bg-white/50 rounded-lg">
+                          <Tag className="h-4 w-4 text-green-600" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Parent Category</p>
+                            <p className="text-xs text-gray-500">{getCategoryName(subCategory.categoryId)}</p>
                           </div>
                         </div>
                       </div>
-                      <div className="flex space-x-1">
-                        <button 
-                          onClick={() => handleEditSubCategory(subCategory)}
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteSubCategory(subCategory.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      
                     </div>
-                    
-                    <div className="grid grid-cols-1 gap-4 mb-4">
-                      <div className="flex items-center space-x-2 p-3 bg-white/50 rounded-lg">
-                        <Tag className="h-4 w-4 text-green-600" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Parent Category</p>
-                          <p className="text-xs text-gray-500">{getCategoryName(subCategory.categoryId)}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
 
           {selectedFilter === 'sections' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredSectionsData.map((section) => (
-                <div key={section.id} className="group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20 overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                          <Package className="h-6 w-6 text-white" />
+              {loadingStates.sections ? (
+                Array.from({ length: 6 }).map((_, index) => (
+                  <SectionSkeleton key={index} />
+                ))
+              ) : (
+                filteredSectionsData.map((section) => (
+                  <div key={section.id} className="group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20 overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+                    <div className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                            <Package className="h-6 w-6 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">{section.material}</h3>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                {section.type}
+                              </span>
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                {section.amount}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-900">{section.material}</h3>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                              {section.type}
-                            </span>
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                              {section.amount}
-                            </span>
+                        <div className="flex space-x-1">
+                          <button 
+                            onClick={() => handleEditSection(section)}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteSection(section.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-gray-600 mb-4 text-sm leading-relaxed">
+                        {section.description}
+                      </p>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="flex items-center space-x-2 p-3 bg-white/50 rounded-lg">
+                          <Tag className="h-4 w-4 text-green-600" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Category</p>
+                            <p className="text-xs text-gray-500">{getCategoryName(section.categoryId)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 p-3 bg-white/50 rounded-lg">
+                          <Layers className="h-4 w-4 text-purple-600" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Sub Category</p>
+                            <p className="text-xs text-gray-500">{getSubCategoryName(section.subCategoryId)}</p>
                           </div>
                         </div>
                       </div>
-                      <div className="flex space-x-1">
-                        <button 
-                          onClick={() => handleEditSection(section)}
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteSection(section.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <p className="text-gray-600 mb-4 text-sm leading-relaxed">
-                      {section.description}
-                    </p>
-                    
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div className="flex items-center space-x-2 p-3 bg-white/50 rounded-lg">
-                        <Tag className="h-4 w-4 text-green-600" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Category</p>
-                          <p className="text-xs text-gray-500">{getCategoryName(section.categoryId)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2 p-3 bg-white/50 rounded-lg">
-                        <Layers className="h-4 w-4 text-purple-600" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Sub Category</p>
-                          <p className="text-xs text-gray-500">{getSubCategoryName(section.subCategoryId)}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="pt-4 border-t border-white/20">
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <div className="flex items-center space-x-1">
-                          <span>Amount: {section.amount} {section.type}</span>
+                      <div className="pt-4 border-t border-white/20">
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <div className="flex items-center space-x-1">
+                            <span>Amount: {section.amount} {section.type}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
 
