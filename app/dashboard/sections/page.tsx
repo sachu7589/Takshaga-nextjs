@@ -149,7 +149,6 @@ export default function SectionsPage() {
   
   // Loading and error states
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
   const [loadingStates, setLoadingStates] = useState({
     categories: false,
     subCategories: false,
@@ -269,22 +268,16 @@ export default function SectionsPage() {
 
   // Load all data with proper error handling and retry logic
   const loadAllData = async () => {
-    setInitialLoading(true);
     setError(null);
     
+    // Set all loading states to true
+    setLoadingStates({
+      categories: true,
+      subCategories: true,
+      sections: true
+    });
+    
     try {
-      // Show loading message to user
-      Swal.fire({
-        title: 'Loading Data...',
-        text: 'Please wait while we fetch your data from the database',
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false,
-        didOpen: () => {
-          Swal.showLoading();
-        }
-      });
-
       // Fetch all data in parallel with individual error handling
       const results = await Promise.allSettled([
         fetchWithRetry('/api/categories'),
@@ -331,8 +324,12 @@ export default function SectionsPage() {
       setError('Failed to load data. Please check your connection and try again.');
       setRetryCount(prev => prev + 1);
     } finally {
-      setInitialLoading(false);
-      Swal.close();
+      // Set all loading states to false
+      setLoadingStates({
+        categories: false,
+        subCategories: false,
+        sections: false
+      });
     }
   };
 
@@ -800,18 +797,7 @@ export default function SectionsPage() {
         </div>
       )}
 
-      {/* Loading State */}
-      {initialLoading && (
-        <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-8 shadow-lg border border-white/20">
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-900">Loading Data</h3>
-              <p className="text-gray-600 mt-1">Please wait while we fetch your data from the database...</p>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Search and Filters */}
       <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg border border-white/20 p-6">
@@ -852,7 +838,14 @@ export default function SectionsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Categories</p>
-              <p className="text-2xl font-bold text-gray-900">{categories.length}</p>
+              {loadingStates.categories ? (
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
+                  <span className="text-lg text-gray-500">Loading...</span>
+                </div>
+              ) : (
+                <p className="text-2xl font-bold text-gray-900">{categories.length}</p>
+              )}
             </div>
             <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl">
               <Tag className="h-6 w-6 text-white" />
@@ -864,7 +857,14 @@ export default function SectionsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Sub Categories</p>
-              <p className="text-2xl font-bold text-gray-900">{subCategories.length}</p>
+              {loadingStates.subCategories ? (
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
+                  <span className="text-lg text-gray-500">Loading...</span>
+                </div>
+              ) : (
+                <p className="text-2xl font-bold text-gray-900">{subCategories.length}</p>
+              )}
             </div>
             <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl">
               <Layers className="h-6 w-6 text-white" />
@@ -876,7 +876,14 @@ export default function SectionsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Sections</p>
-              <p className="text-2xl font-bold text-gray-900">{sectionsData.length}</p>
+              {loadingStates.sections ? (
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
+                  <span className="text-lg text-gray-500">Loading...</span>
+                </div>
+              ) : (
+                <p className="text-2xl font-bold text-gray-900">{sectionsData.length}</p>
+              )}
             </div>
             <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl">
               <Package className="h-6 w-6 text-white" />
@@ -1091,7 +1098,12 @@ export default function SectionsPage() {
           {selectedFilter === 'all' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Categories */}
-              {filteredCategories.map((category) => (
+              {loadingStates.categories ? (
+                Array.from({ length: 3 }).map((_, index) => (
+                  <CategorySkeleton key={`cat-${index}`} />
+                ))
+              ) : (
+                filteredCategories.map((category) => (
                 <div key={category.id} className="group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20 overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-emerald-600"></div>
                   <div className="p-6">
@@ -1137,7 +1149,8 @@ export default function SectionsPage() {
                     
                   </div>
                 </div>
-              ))}
+              ))
+            )}
 
               {/* Sub Categories */}
               {filteredSubCategories.map((subCategory) => (
