@@ -18,6 +18,17 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import Swal from 'sweetalert2';
 
+interface Measurement {
+  id: string;
+  length: number;
+  breadth: number;
+}
+
+interface RunningMeasurement {
+  id: string;
+  length: number;
+}
+
 interface Item {
   id: string;
   sectionId: string;
@@ -28,8 +39,10 @@ interface Item {
   type: 'area' | 'pieces' | 'running' | 'running_sq_feet';
   length?: number;
   breadth?: number;
+  measurements?: Measurement[];
   pieces?: number;
   runningLength?: number;
+  runningMeasurements?: RunningMeasurement[];
   description: string;
   totalAmount: number;
 }
@@ -81,6 +94,12 @@ export default function InteriorEstimatePage() {
   const [showCustomItemModal, setShowCustomItemModal] = useState(false);
   const [editingItemData, setEditingItemData] = useState<Item | null>(null);
   const [showPresetModal, setShowPresetModal] = useState(false);
+  const [showMeasurementModal, setShowMeasurementModal] = useState(false);
+  const [showEstimateNameModal, setShowEstimateNameModal] = useState(false);
+  const [estimateName, setEstimateName] = useState("");
+  const [newMeasurement, setNewMeasurement] = useState({ length: "", breadth: "" });
+  const [discount, setDiscount] = useState<number>(0);
+  const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
   const [presets, setPresets] = useState<Array<{id: string; name: string; items: Item[]; totalAmount: number}>>([]);
   const [presetsLoading, setPresetsLoading] = useState(false);
   const [customItem, setCustomItem] = useState({
@@ -95,7 +114,8 @@ export default function InteriorEstimatePage() {
     breadth: "",
     pieces: "",
     runningLength: "",
-    totalAmount: ""
+    totalAmount: "",
+    measurements: [] as Measurement[]
   });
 
   // Fetch data from database
@@ -211,7 +231,7 @@ export default function InteriorEstimatePage() {
         materialName: section.material || "",
         type: section.type,
         description: section.description || "",
-        totalAmount: section.amount || 0,
+        totalAmount: 0, // Will be calculated when user inputs dimensions
         ...(section.type === 'area' && {
           length: 0,
           breadth: 0
@@ -253,9 +273,22 @@ export default function InteriorEstimatePage() {
   const handleSaveEdit = (itemId: string) => {
     if (!editingItemData) return;
 
+    // Recalculate total amount based on the type
+    const amountPerSqFt = editingItemData.totalAmount;
+    const calculatedTotal = calculateTotalAmount(
+      editingItemData.type,
+      editingItemData.length || 0,
+      editingItemData.breadth || 0,
+      editingItemData.pieces || 0,
+      editingItemData.runningLength || 0,
+      amountPerSqFt,
+      editingItemData.measurements
+    );
+
     const updatedItem: Item = {
       ...editingItemData,
-      id: itemId
+      id: itemId,
+      totalAmount: calculatedTotal
     };
 
     setItems(prev => prev.map(item => item.id === itemId ? updatedItem : item));
@@ -297,8 +330,177 @@ export default function InteriorEstimatePage() {
     setShowCustomItemModal(true);
   };
 
+  const addMeasurementDirectly = (item: Item) => {
+    const measurement = {
+      id: Date.now().toString(),
+      length: 0,
+      breadth: 0
+    };
+
+    const updatedMeasurements = [...(item.measurements || []), measurement];
+    updateItemTotal(item.id, { measurements: updatedMeasurements });
+    setEditingItemData(prev => prev ? { ...prev, measurements: updatedMeasurements } : null);
+  };
+
+  const addRunningMeasurementDirectly = (item: Item) => {
+    const runningMeasurement = {
+      id: Date.now().toString(),
+      length: 0
+    };
+
+    const updatedRunningMeasurements = [...(item.runningMeasurements || []), runningMeasurement];
+    updateItemTotal(item.id, { runningMeasurements: updatedRunningMeasurements });
+    setEditingItemData(prev => prev ? { ...prev, runningMeasurements: updatedRunningMeasurements } : null);
+  };
+
+  const addMeasurementToItem = () => {
+    if (!newMeasurement.length || !newMeasurement.breadth) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Missing Information',
+        text: 'Please enter both length and breadth.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      });
+      return;
+    }
+
+    const measurement = {
+      id: Date.now().toString(),
+      length: parseFloat(newMeasurement.length) || 0,
+      breadth: parseFloat(newMeasurement.breadth) || 0
+    };
+
+    if (editingItem) {
+      const updatedMeasurements = [...(editingItem.measurements || []), measurement];
+      updateItemTotal(editingItem.id, { measurements: updatedMeasurements });
+      setEditingItemData(prev => prev ? { ...prev, measurements: updatedMeasurements } : null);
+    }
+
+    setNewMeasurement({ length: "", breadth: "" });
+    setShowMeasurementModal(false);
+  };
+
+  // Function to convert cm to sq feet
+  const cmToSqFeet = (lengthCm: number, breadthCm: number): number => {
+    // 1 sq ft = 929.03 sq cm
+    const sqCm = lengthCm * breadthCm;
+    const result = sqCm / 929.03;
+    return isFinite(result) ? result : 0;
+  };
+
+  // Function to calculate total sq feet from multiple measurements
+  const calculateTotalSqFeet = (measurements: Measurement[]): number => {
+    return measurements.reduce((total, measurement) => {
+      return total + cmToSqFeet(measurement.length, measurement.breadth);
+    }, 0);
+  };
+
+  // Function to calculate total running feet from multiple running measurements
+  const calculateTotalRunningFeet = (runningMeasurements: RunningMeasurement[]): number => {
+    return runningMeasurements.reduce((total, measurement) => {
+      return total + cmToFeet(measurement.length);
+    }, 0);
+  };
+
+  // Function to convert cm to feet
+  const cmToFeet = (cm: number): number => {
+    // 1 ft = 30.48 cm
+    const result = cm / 30.48;
+    return isFinite(result) ? result : 0;
+  };
+
+  // Calculate subtotal (sum of all items)
+  const calculateSubtotal = (): number => {
+    return items.reduce((sum, item) => sum + item.totalAmount, 0);
+  };
+
+  // Calculate discount amount
+  const calculateDiscountAmount = (): number => {
+    const subtotal = calculateSubtotal();
+    if (discountType === 'percentage') {
+      return (subtotal * discount) / 100;
+    } else {
+      return discount; // Fixed amount discount
+    }
+  };
+
+  // Calculate final total after discount
+  const calculateFinalTotal = (): number => {
+    const subtotal = calculateSubtotal();
+    const discountAmount = calculateDiscountAmount();
+    return subtotal - discountAmount;
+  };
+
+  // Function to calculate total amount based on type
+  const calculateTotalAmount = (type: string, length?: number, breadth?: number, pieces?: number, runningLength?: number, amountPerSqFt?: number, measurements?: Measurement[], runningMeasurements?: RunningMeasurement[]): number => {
+    switch (type) {
+      case 'area':
+        if (amountPerSqFt) {
+          let totalSqFeet = 0;
+          if (measurements && measurements.length > 0) {
+            // Use multiple measurements if available
+            totalSqFeet = calculateTotalSqFeet(measurements);
+          } else if (length && breadth) {
+            // Fallback to single length/breadth
+            totalSqFeet = cmToSqFeet(length, breadth);
+          }
+          const result = totalSqFeet * amountPerSqFt;
+          return isFinite(result) ? result : 0;
+        }
+        return 0;
+      case 'pieces':
+        if (pieces && amountPerSqFt) {
+          const result = pieces * amountPerSqFt;
+          return isFinite(result) ? result : 0;
+        }
+        return 0;
+      case 'running':
+      case 'running_sq_feet':
+        if (amountPerSqFt) {
+          let totalFeet = 0;
+          if (runningMeasurements && runningMeasurements.length > 0) {
+            // Use multiple running measurements if available
+            totalFeet = calculateTotalRunningFeet(runningMeasurements);
+          } else if (runningLength) {
+            // Fallback to single running length
+            totalFeet = cmToFeet(runningLength);
+          }
+          const result = totalFeet * amountPerSqFt;
+          return isFinite(result) ? result : 0;
+        }
+        return 0;
+      default:
+        return 0;
+    }
+  };
+
+  // Function to update item total when dimensions change
+  const updateItemTotal = (itemId: string, newData: Partial<Item>) => {
+    setItems(prev => prev.map(item => {
+      if (item.id === itemId) {
+        const updatedItem = { ...item, ...newData };
+        const amountPerSqFt = updatedItem.totalAmount;
+        const calculatedTotal = calculateTotalAmount(
+          updatedItem.type,
+          updatedItem.length || 0,
+          updatedItem.breadth || 0,
+          updatedItem.pieces || 0,
+          updatedItem.runningLength || 0,
+          amountPerSqFt,
+          updatedItem.measurements,
+          updatedItem.runningMeasurements
+        );
+        return { ...updatedItem, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 };
+      }
+      return item;
+    }));
+  };
+
   const handleSaveCustomItem = () => {
-    if (!customItem.categoryName || !customItem.subCategoryName || !customItem.materialName || !customItem.totalAmount) {
+    if (!customItem.categoryName || !customItem.subCategoryName || !customItem.materialName) {
       Swal.fire({
         icon: 'error',
         title: 'Missing Information',
@@ -311,6 +513,59 @@ export default function InteriorEstimatePage() {
       return;
     }
 
+    // Validate area type inputs
+    if (customItem.type === 'area' && !customItem.totalAmount) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Missing Information',
+        text: 'For area type, please fill in amount per sq ft.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      });
+      return;
+    }
+
+    // Validate pieces type inputs
+    if (customItem.type === 'pieces' && (!customItem.pieces || !customItem.totalAmount)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Missing Information',
+        text: 'For pieces type, please fill in number of pieces and amount per piece.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      });
+      return;
+    }
+
+    // Validate running type inputs
+    if (customItem.type === 'running' && (!customItem.runningLength || !customItem.totalAmount)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Missing Information',
+        text: 'For running type, please fill in running length and amount per sq ft.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      });
+      return;
+    }
+
+    const amountPerSqFt = parseFloat(customItem.totalAmount) || 0;
+    const calculatedTotal = calculateTotalAmount(
+      customItem.type,
+      parseFloat(customItem.length) || 0,
+      parseFloat(customItem.breadth) || 0,
+      parseInt(customItem.pieces) || 0,
+      parseFloat(customItem.runningLength) || 0,
+      amountPerSqFt,
+      customItem.measurements
+    );
+
     const item: Item = {
       id: Date.now().toString(),
       sectionId: 'custom',
@@ -320,10 +575,11 @@ export default function InteriorEstimatePage() {
       materialName: customItem.materialName,
       type: customItem.type,
       description: customItem.description,
-      totalAmount: parseFloat(customItem.totalAmount) || 0,
+      totalAmount: calculatedTotal,
       ...(customItem.type === 'area' && {
         length: parseFloat(customItem.length) || 0,
-        breadth: parseFloat(customItem.breadth) || 0
+        breadth: parseFloat(customItem.breadth) || 0,
+        measurements: customItem.measurements.length > 0 ? customItem.measurements : undefined
       }),
       ...(customItem.type === 'pieces' && {
         pieces: parseInt(customItem.pieces) || 0
@@ -347,7 +603,8 @@ export default function InteriorEstimatePage() {
       breadth: "",
       pieces: "",
       runningLength: "",
-      totalAmount: ""
+      totalAmount: "",
+      measurements: []
     });
 
     Swal.fire({
@@ -377,22 +634,54 @@ export default function InteriorEstimatePage() {
       return;
     }
 
-    try {
-      const totalAmount = items.reduce((sum, item) => sum + item.totalAmount, 0);
-      
-      // Here you would typically send the data to your API
-      console.log("Interior estimate data:", {
-        clientId,
-        clientName,
-        items,
-        totalAmount
+    // Show the estimate name modal
+    setShowEstimateNameModal(true);
+  };
+
+  const handleSaveEstimateWithName = async () => {
+    if (!estimateName.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Estimate Name Required',
+        text: 'Please enter a name for the estimate.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
       });
+      return;
+    }
+
+    try {
+      const totalAmount = calculateFinalTotal();
+      
+      // Send data to API
+      const response = await fetch('/api/interior-estimates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientId,
+          estimateName: estimateName.trim(),
+          items,
+          totalAmount,
+          discount,
+          discountType
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save estimate');
+      }
       
       // Show success alert
       Swal.fire({
         icon: 'success',
         title: 'Interior Estimate Created!',
-        text: `Estimate for ${clientName} has been prepared successfully.`,
+        text: `Estimate "${estimateName}" for ${clientName} has been saved successfully.`,
         position: 'top-end',
         toast: true,
         showConfirmButton: false,
@@ -403,15 +692,20 @@ export default function InteriorEstimatePage() {
         iconColor: '#10b981'
       });
 
-      // Reset items
+      // Reset items and close modal
       setItems([]);
+      setEstimateName("");
+      setShowEstimateNameModal(false);
+
+      // Redirect to estimate details page
+      router.push(`/dashboard/estimates/interior/${data.estimateId}`);
 
     } catch (error) {
       console.error('Error creating estimate:', error);
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'Failed to create estimate',
+        text: error instanceof Error ? error.message : 'Failed to create estimate',
         position: 'top-end',
         toast: true,
         showConfirmButton: false,
@@ -597,9 +891,56 @@ export default function InteriorEstimatePage() {
         </div>
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Total Amount</h3>
-          <p className="text-3xl font-bold text-green-600">
-            ₹{items.reduce((sum, item) => sum + item.totalAmount, 0).toLocaleString()}
-          </p>
+          
+          {/* Subtotal */}
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-gray-700 font-medium">Subtotal:</span>
+            <span className="text-gray-900 font-semibold">
+              ₹{calculateSubtotal().toLocaleString()}
+            </span>
+          </div>
+
+          {/* Discount Section */}
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center space-x-2">
+              <span className="text-gray-700 font-medium">Discount:</span>
+              <select
+                value={discountType}
+                onChange={(e) => {
+                  setDiscountType(e.target.value as 'percentage' | 'fixed');
+                }}
+                className="px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+              >
+                <option value="percentage">%</option>
+                <option value="fixed">₹</option>
+              </select>
+              <input
+                type="number"
+                value={discount}
+                onChange={(e) => {
+                  const newDiscount = parseFloat(e.target.value) || 0;
+                  setDiscount(newDiscount);
+                }}
+                className="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                min="0"
+                max={discountType === 'percentage' ? "100" : undefined}
+                step="0.1"
+              />
+            </div>
+            <span className="text-gray-900 font-semibold">
+              -₹{calculateDiscountAmount().toLocaleString()}
+            </span>
+          </div>
+
+          {/* Final Total */}
+          <div className="border-t border-gray-200 pt-2 mt-2">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-900 font-bold text-lg">Grand Total:</span>
+              <span className="text-green-600 font-bold text-2xl">
+                ₹{calculateFinalTotal().toLocaleString()}
+              </span>
+            </div>
+          </div>
         </div>
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Client</h3>
@@ -728,17 +1069,23 @@ export default function InteriorEstimatePage() {
                               <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Description</th>
                               {categoryItems.some(item => item.type === 'area') && (
                                 <>
-                                  <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Length</th>
-                                  <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Breadth</th>
+                                  <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Length (cm)</th>
+                                  <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200"></th>
+                                  <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Breadth (cm)</th>
+                                  <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Sq Feet</th>
                                 </>
                               )}
                               {categoryItems.some(item => item.type === 'pieces') && (
                                 <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Pieces</th>
                               )}
                               {categoryItems.some(item => item.type === 'running') && (
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Running Length</th>
+                                <>
+                                  <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Running Length (cm)</th>
+                                  <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200"></th>
+                                  <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Feet</th>
+                                </>
                               )}
-                              <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Amount</th>
+                                                              <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Amount per sq ft</th>
                               <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Total</th>
                               <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Actions</th>
                             </tr>
@@ -774,26 +1121,179 @@ export default function InteriorEstimatePage() {
                                   <>
                                     <td className="py-3 px-4 text-sm text-gray-600">
                                       {editingItem?.id === item.id && item.type === 'area' ? (
-                                        <input
-                                          type="number"
-                                          value={editingItemData?.length || item.length || 0}
-                                          onChange={(e) => setEditingItemData(prev => prev ? { ...prev, length: parseFloat(e.target.value) || 0 } : null)}
-                                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
-                                        />
+                                        <div className="space-y-2">
+                                          <div className="flex justify-end">
+                                            <input
+                                              type="number"
+                                              value={editingItemData?.length || item.length || 0}
+                                              onChange={(e) => {
+                                                const newLength = parseFloat(e.target.value) || 0;
+                                                setEditingItemData(prev => prev ? { ...prev, length: newLength } : null);
+                                                updateItemTotal(item.id, { length: newLength });
+                                              }}
+                                              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                                              placeholder="Length"
+                                            />
+                                          </div>
+                                          {/* Show added measurements */}
+                                          {editingItemData?.measurements && editingItemData.measurements.length > 0 && (
+                                            <div className="space-y-1">
+                                              {editingItemData.measurements.map((measurement) => (
+                                                <div key={measurement.id} className="flex justify-end">
+                                                  <input
+                                                    type="number"
+                                                    value={measurement.length}
+                                                    onChange={(e) => {
+                                                      const newMeasurements = editingItemData.measurements?.map(m => 
+                                                        m.id === measurement.id ? { ...m, length: parseFloat(e.target.value) || 0 } : m
+                                                      ) || [];
+                                                      setEditingItemData(prev => prev ? { ...prev, measurements: newMeasurements } : null);
+                                                      updateItemTotal(item.id, { measurements: newMeasurements });
+                                                    }}
+                                                    className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    placeholder="Length"
+                                                  />
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
                                       ) : (
-                                        item.type === 'area' ? item.length : '-'
+                                        item.type === 'area' ? (
+                                          item.measurements && item.measurements.length > 0 ? (
+                                            <div className="space-y-1">
+                                              <div className="text-center">{item.length || 0}</div>
+                                              {item.measurements.map((measurement) => (
+                                                <div key={measurement.id} className="text-center text-xs text-gray-500">
+                                                  {measurement.length}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="text-center">{item.length || 0}</div>
+                                          )
+                                        ) : '-'
                                       )}
                                     </td>
                                     <td className="py-3 px-4 text-sm text-gray-600">
                                       {editingItem?.id === item.id && item.type === 'area' ? (
-                                        <input
-                                          type="number"
-                                          value={editingItemData?.breadth || item.breadth || 0}
-                                          onChange={(e) => setEditingItemData(prev => prev ? { ...prev, breadth: parseFloat(e.target.value) || 0 } : null)}
-                                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
-                                        />
+                                        <div className="space-y-2">
+                                          {/* Empty space for first row */}
+                                          <div className="h-8"></div>
+                                          {/* Cross icons for each measurement */}
+                                          {editingItemData?.measurements && editingItemData.measurements.length > 0 && (
+                                            <div className="space-y-1">
+                                              {editingItemData.measurements.map((measurement) => (
+                                                <div key={measurement.id} className="flex justify-center">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const newMeasurements = editingItemData.measurements?.filter(m => m.id !== measurement.id) || [];
+                                                      setEditingItemData(prev => prev ? { ...prev, measurements: newMeasurements } : null);
+                                                      updateItemTotal(item.id, { measurements: newMeasurements });
+                                                    }}
+                                                    className="w-6 h-6 bg-red-500 text-white rounded flex items-center justify-center hover:bg-red-600 transition-colors"
+                                                    title="Remove Measurement"
+                                                  >
+                                                    ×
+                                                  </button>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                          {/* Add button in 3rd row */}
+                                          <div className="flex justify-center">
+                                            <button
+                                              type="button"
+                                              onClick={() => addMeasurementDirectly(item)}
+                                              className="w-6 h-6 bg-blue-600 text-white rounded flex items-center justify-center hover:bg-blue-700 transition-colors"
+                                              title="Add Measurement"
+                                            >
+                                              <Plus className="h-3 w-3" />
+                                            </button>
+                                          </div>
+                                        </div>
                                       ) : (
-                                        item.type === 'area' ? item.breadth : '-'
+                                        '-'
+                                      )}
+                                    </td>
+                                    <td className="py-3 px-4 text-sm text-gray-600">
+                                      {editingItem?.id === item.id && item.type === 'area' ? (
+                                        <div className="space-y-2">
+                                          <input
+                                            type="number"
+                                            value={editingItemData?.breadth || item.breadth || 0}
+                                            onChange={(e) => {
+                                              const newBreadth = parseFloat(e.target.value) || 0;
+                                              setEditingItemData(prev => prev ? { ...prev, breadth: newBreadth } : null);
+                                              updateItemTotal(item.id, { breadth: newBreadth });
+                                            }}
+                                            className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                                            placeholder="Breadth"
+                                          />
+                                          {/* Show added measurements */}
+                                          {editingItemData?.measurements && editingItemData.measurements.length > 0 && (
+                                            <div className="space-y-1">
+                                              {editingItemData.measurements.map((measurement) => (
+                                                <div key={measurement.id}>
+                                                  <input
+                                                    type="number"
+                                                    value={measurement.breadth}
+                                                    onChange={(e) => {
+                                                      const newMeasurements = editingItemData.measurements?.map(m => 
+                                                        m.id === measurement.id ? { ...m, breadth: parseFloat(e.target.value) || 0 } : m
+                                                      ) || [];
+                                                      setEditingItemData(prev => prev ? { ...prev, measurements: newMeasurements } : null);
+                                                      updateItemTotal(item.id, { measurements: newMeasurements });
+                                                    }}
+                                                    className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    placeholder="Breadth"
+                                                  />
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        item.type === 'area' ? (
+                                          item.measurements && item.measurements.length > 0 ? (
+                                            <div className="space-y-1">
+                                              <div className="text-center">{item.breadth || 0}</div>
+                                              {item.measurements.map((measurement) => (
+                                                <div key={measurement.id} className="text-center text-xs text-gray-500">
+                                                  {measurement.breadth}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="text-center">{item.breadth || 0}</div>
+                                          )
+                                        ) : '-'
+                                      )}
+                                    </td>
+
+
+                                    <td className="py-3 px-4 text-sm text-gray-600">
+                                      {editingItem?.id === item.id && item.type === 'area' ? (
+                                        <div className="text-sm font-medium text-blue-600">
+                                          {(() => {
+                                            const singleSqFeet = cmToSqFeet(editingItemData?.length || 0, editingItemData?.breadth || 0);
+                                            const measurementsSqFeet = editingItemData?.measurements ? calculateTotalSqFeet(editingItemData.measurements) : 0;
+                                            const total = singleSqFeet + measurementsSqFeet;
+                                            return total.toFixed(2);
+                                          })()} sq ft
+                                        </div>
+                                      ) : (
+                                        item.type === 'area' ? (
+                                          <div className="text-center">
+                                            {(() => {
+                                              const singleSqFeet = cmToSqFeet(item.length || 0, item.breadth || 0);
+                                              const measurementsSqFeet = item.measurements ? calculateTotalSqFeet(item.measurements) : 0;
+                                              const total = singleSqFeet + measurementsSqFeet;
+                                              return total.toFixed(2);
+                                            })()}
+                                          </div>
+                                        ) : '-'
                                       )}
                                     </td>
                                   </>
@@ -801,45 +1301,182 @@ export default function InteriorEstimatePage() {
                                 {categoryItems.some(i => i.type === 'pieces') && (
                                   <td className="py-3 px-4 text-sm text-gray-600">
                                     {editingItem?.id === item.id && item.type === 'pieces' ? (
-                                      <input
-                                        type="number"
-                                        value={editingItemData?.pieces || item.pieces || 0}
-                                        onChange={(e) => setEditingItemData(prev => prev ? { ...prev, pieces: parseInt(e.target.value) || 0 } : null)}
-                                        className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
-                                      />
+                                                                              <input
+                                          type="number"
+                                          value={editingItemData?.pieces || item.pieces || 0}
+                                          onChange={(e) => {
+                                            const newPieces = parseInt(e.target.value) || 0;
+                                            setEditingItemData(prev => prev ? { ...prev, pieces: newPieces } : null);
+                                            updateItemTotal(item.id, { pieces: newPieces });
+                                          }}
+                                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                                        />
                                     ) : (
-                                      item.type === 'pieces' ? item.pieces : '-'
+                                      item.type === 'pieces' ? (
+                                        <div className="text-center">{item.pieces}</div>
+                                      ) : '-'
                                     )}
                                   </td>
                                 )}
-                                {categoryItems.some(i => i.type === 'running') && (
-                                  <td className="py-3 px-4 text-sm text-gray-600">
-                                    {editingItem?.id === item.id && item.type === 'running' ? (
-                                      <input
-                                        type="number"
-                                        value={editingItemData?.runningLength || item.runningLength || 0}
-                                        onChange={(e) => setEditingItemData(prev => prev ? { ...prev, runningLength: parseFloat(e.target.value) || 0 } : null)}
-                                        className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
-                                      />
-                                    ) : (
-                                      item.type === 'running' ? item.runningLength : '-'
-                                    )}
-                                  </td>
+                                                                {categoryItems.some(i => i.type === 'running') && (
+                                  <>
+                                    <td className="py-3 px-4 text-sm text-gray-600">
+                                      {editingItem?.id === item.id && item.type === 'running' ? (
+                                        <div className="space-y-2">
+                                          <div className="flex justify-center">
+                                            <input
+                                              type="number"
+                                              value={editingItemData?.runningLength || item.runningLength || 0}
+                                              onChange={(e) => {
+                                                const newRunningLength = parseFloat(e.target.value) || 0;
+                                                setEditingItemData(prev => prev ? { ...prev, runningLength: newRunningLength } : null);
+                                                updateItemTotal(item.id, { runningLength: newRunningLength });
+                                              }}
+                                              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                                              placeholder="Length"
+                                            />
+                                          </div>
+                                          {/* Show added running measurements */}
+                                          {editingItemData?.runningMeasurements && editingItemData.runningMeasurements.length > 0 && (
+                                            <div className="space-y-1">
+                                              {editingItemData.runningMeasurements.map((measurement) => (
+                                                <div key={measurement.id} className="flex justify-center">
+                                                  <input
+                                                    type="number"
+                                                    value={measurement.length}
+                                                    onChange={(e) => {
+                                                      const newRunningMeasurements = editingItemData.runningMeasurements?.map(m => 
+                                                        m.id === measurement.id ? { ...m, length: parseFloat(e.target.value) || 0 } : m
+                                                      ) || [];
+                                                      setEditingItemData(prev => prev ? { ...prev, runningMeasurements: newRunningMeasurements } : null);
+                                                      updateItemTotal(item.id, { runningMeasurements: newRunningMeasurements });
+                                                    }}
+                                                    className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    placeholder="Length"
+                                                  />
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        item.type === 'running' ? (
+                                          item.runningMeasurements && item.runningMeasurements.length > 0 ? (
+                                            <div className="space-y-1">
+                                              <div className="text-center">{item.runningLength || 0}</div>
+                                              {item.runningMeasurements.map((measurement) => (
+                                                <div key={measurement.id} className="text-center text-xs text-gray-500">
+                                                  {measurement.length}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="text-center">{item.runningLength || 0}</div>
+                                          )
+                                        ) : '-'
+                                      )}
+                                    </td>
+                                    <td className="py-3 px-4 text-sm text-gray-600">
+                                      {editingItem?.id === item.id && item.type === 'running' ? (
+                                        <div className="space-y-2">
+                                          {/* Empty space for first row */}
+                                          <div className="h-8"></div>
+                                          {/* Cross icons for each running measurement */}
+                                          {editingItemData?.runningMeasurements && editingItemData.runningMeasurements.length > 0 && (
+                                            <div className="space-y-1">
+                                              {editingItemData.runningMeasurements.map((measurement) => (
+                                                <div key={measurement.id} className="flex justify-center">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const newRunningMeasurements = editingItemData.runningMeasurements?.filter(m => m.id !== measurement.id) || [];
+                                                      setEditingItemData(prev => prev ? { ...prev, runningMeasurements: newRunningMeasurements } : null);
+                                                      updateItemTotal(item.id, { runningMeasurements: newRunningMeasurements });
+                                                    }}
+                                                    className="w-6 h-6 bg-red-500 text-white rounded flex items-center justify-center hover:bg-red-600 transition-colors"
+                                                    title="Remove Measurement"
+                                                  >
+                                                    ×
+                                                  </button>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                          {/* Add button in 3rd row */}
+                                          <div className="flex justify-center">
+                                            <button
+                                              type="button"
+                                              onClick={() => addRunningMeasurementDirectly(item)}
+                                              className="w-6 h-6 bg-blue-600 text-white rounded flex items-center justify-center hover:bg-blue-700 transition-colors"
+                                              title="Add Measurement"
+                                            >
+                                              <Plus className="h-3 w-3" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        '-'
+                                      )}
+                                    </td>
+                                    <td className="py-3 px-4 text-sm text-gray-600">
+                                      {editingItem?.id === item.id && item.type === 'running' ? (
+                                        <div className="text-sm font-medium text-blue-600">
+                                          {(() => {
+                                            const singleFeet = cmToFeet(editingItemData?.runningLength || 0);
+                                            const measurementsFeet = editingItemData?.runningMeasurements ? calculateTotalRunningFeet(editingItemData.runningMeasurements) : 0;
+                                            const total = singleFeet + measurementsFeet;
+                                            return total.toFixed(2);
+                                          })()} ft
+                                        </div>
+                                      ) : (
+                                        item.type === 'running' ? (
+                                          (() => {
+                                            const singleFeet = cmToFeet(item.runningLength || 0);
+                                            const measurementsFeet = item.runningMeasurements ? calculateTotalRunningFeet(item.runningMeasurements) : 0;
+                                            const total = singleFeet + measurementsFeet;
+                                            return total.toFixed(2);
+                                          })()
+                                        ) : '-'
+                                      )}
+                                    </td>
+                                  </>
                                 )}
                                 <td className="py-3 px-4 text-sm text-gray-600">
                                   {editingItem?.id === item.id ? (
                                     <input
                                       type="number"
                                       value={editingItemData?.totalAmount || item.totalAmount}
-                                      onChange={(e) => setEditingItemData(prev => prev ? { ...prev, totalAmount: parseFloat(e.target.value) || 0 } : null)}
+                                      onChange={(e) => {
+                                        const newAmount = parseFloat(e.target.value) || 0;
+                                        setEditingItemData(prev => prev ? { ...prev, totalAmount: newAmount } : null);
+                                        updateItemTotal(item.id, { totalAmount: newAmount });
+                                      }}
                                       className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                                     />
                                   ) : (
-                                    `₹${item.totalAmount.toLocaleString()}`
+                                    <div className="text-center">
+                                      ₹{(() => {
+                                        let amount = 0;
+                                        if (item.type === 'area') {
+                                          const sqFeet = cmToSqFeet(item.length || 0, item.breadth || 0);
+                                          amount = sqFeet > 0 ? (item.totalAmount / sqFeet) : 0;
+                                        } else if (item.type === 'pieces') {
+                                          amount = (item.pieces || 0) > 0 ? (item.totalAmount / (item.pieces || 1)) : 0;
+                                        } else {
+                                          amount = item.totalAmount;
+                                        }
+                                        return isFinite(amount) ? amount.toFixed(2) : '0.00';
+                                      })().toLocaleString()}
+                                    </div>
                                   )}
                                 </td>
                                 <td className="py-3 px-4 text-sm font-semibold text-green-600">
-                                  ₹{(editingItemData?.totalAmount || item.totalAmount).toLocaleString()}
+                                  <div className="text-center">
+                                    ₹{(() => {
+                                      const amount = editingItemData?.totalAmount || item.totalAmount;
+                                      return isFinite(amount) ? amount.toFixed(1) : '0.0';
+                                    })()}
+                                  </div>
                                 </td>
                                 <td className="py-3 px-4">
                                   <div className="flex space-x-2">
@@ -902,11 +1539,17 @@ export default function InteriorEstimatePage() {
                   <div className="text-sm text-gray-600">
                     <span className="font-medium">Sub Total:</span> 
                     <span className="ml-2 text-blue-600 font-semibold">
-                      ₹{items.reduce((sum, item) => sum + item.totalAmount, 0).toLocaleString()}
+                      ₹{(() => {
+                        const total = items.reduce((sum, item) => sum + (isFinite(item.totalAmount) ? item.totalAmount : 0), 0);
+                        return isFinite(total) ? total.toFixed(1) : '0.0';
+                      })()}
                     </span>
                   </div>
                   <div className="text-lg font-semibold text-green-600">
-                    Grand Total: ₹{items.reduce((sum, item) => sum + item.totalAmount, 0).toLocaleString()}
+                    Grand Total: ₹{(() => {
+                      const total = items.reduce((sum, item) => sum + (isFinite(item.totalAmount) ? item.totalAmount : 0), 0);
+                      return isFinite(total) ? Math.round(total).toLocaleString() : '0';
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1008,23 +1651,23 @@ export default function InteriorEstimatePage() {
               {customItem.type === 'area' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Length (ft)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Length (cm) - Optional</label>
                     <input
                       type="number"
                       value={customItem.length}
                       onChange={(e) => setCustomItem({...customItem, length: e.target.value})}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-                      placeholder="Enter length"
+                      placeholder="Enter length in cm (optional)"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Breadth (ft)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Breadth (cm) - Optional</label>
                     <input
                       type="number"
                       value={customItem.breadth}
                       onChange={(e) => setCustomItem({...customItem, breadth: e.target.value})}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-                      placeholder="Enter breadth"
+                      placeholder="Enter breadth in cm (optional)"
                     />
                   </div>
                 </div>
@@ -1045,25 +1688,31 @@ export default function InteriorEstimatePage() {
 
               {customItem.type === 'running' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Running Length (ft)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Running Length (cm)</label>
                   <input
                     type="number"
                     value={customItem.runningLength}
                     onChange={(e) => setCustomItem({...customItem, runningLength: e.target.value})}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-                    placeholder="Enter running length"
+                    placeholder="Enter running length in cm"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Total Amount (₹)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {customItem.type === 'area' ? 'Amount per sq ft (₹)' : 
+                   customItem.type === 'pieces' ? 'Amount per piece (₹)' : 
+                   'Amount per sq ft (₹)'}
+                </label>
                 <input
                   type="number"
                   value={customItem.totalAmount}
                   onChange={(e) => setCustomItem({...customItem, totalAmount: e.target.value})}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-                  placeholder="Enter total amount"
+                  placeholder={customItem.type === 'area' ? 'Enter amount per sq ft' : 
+                             customItem.type === 'pieces' ? 'Enter amount per piece' : 
+                             'Enter amount per sq ft'}
                 />
               </div>
             </div>
@@ -1080,6 +1729,71 @@ export default function InteriorEstimatePage() {
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
               >
                 Add Item
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Measurement Modal */}
+      {showMeasurementModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Add Measurement</h3>
+              <button
+                onClick={() => setShowMeasurementModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Length (cm)</label>
+                  <input
+                    type="number"
+                    value={newMeasurement.length}
+                    onChange={(e) => setNewMeasurement({...newMeasurement, length: e.target.value})}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                    placeholder="Enter length in cm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Breadth (cm)</label>
+                  <input
+                    type="number"
+                    value={newMeasurement.breadth}
+                    onChange={(e) => setNewMeasurement({...newMeasurement, breadth: e.target.value})}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                    placeholder="Enter breadth in cm"
+                  />
+                </div>
+              </div>
+
+              {newMeasurement.length && newMeasurement.breadth && (
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <div className="text-sm font-medium text-blue-800">
+                    Square Feet: {cmToSqFeet(parseFloat(newMeasurement.length) || 0, parseFloat(newMeasurement.breadth) || 0).toFixed(2)} sq ft
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => setShowMeasurementModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addMeasurementToItem}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+              >
+                Add Measurement
               </button>
             </div>
           </div>
@@ -1132,6 +1846,52 @@ export default function InteriorEstimatePage() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Estimate Name Modal */}
+      {showEstimateNameModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Save Estimate</h3>
+              <button
+                onClick={() => setShowEstimateNameModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Estimate Name</label>
+                <input
+                  type="text"
+                  value={estimateName}
+                  onChange={(e) => setEstimateName(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                  placeholder="Enter estimate name"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => setShowEstimateNameModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEstimateWithName}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+              >
+                Save Estimate
+              </button>
+            </div>
           </div>
         </div>
       )}

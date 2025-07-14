@@ -1,14 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   FileText, 
   Home, 
   Building, 
   ArrowLeft,
   CheckCircle,
-  Clock,
-  DollarSign,
   Star
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,6 +20,35 @@ interface EstimateType {
   bgColor: string;
 }
 
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}
+
+interface Estimate {
+  _id: string;
+  userId: string;
+  clientId: string;
+  estimateName: string;
+  items: Array<{
+    id: string;
+    sectionName: string;
+    categoryName: string;
+    subCategoryName: string;
+    materialName: string;
+    description: string;
+    totalAmount: number;
+  }>;
+  totalAmount: number;
+  discount?: number;
+  discountType?: 'percentage' | 'fixed';
+  createdAt: string;
+  updatedAt: string;
+  user?: User;
+}
+
 export default function EstimatesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -29,6 +56,51 @@ export default function EstimatesPage() {
   const clientName = searchParams.get('clientName');
 
   const [selectedEstimateType, setSelectedEstimateType] = useState<string | null>(null);
+  const [clientEstimates, setClientEstimates] = useState<Estimate[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch client estimates from API
+  useEffect(() => {
+    const fetchClientEstimates = async () => {
+      if (!clientId) return;
+      
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/interior-estimates/client/${clientId}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch estimates');
+        }
+        
+        const data = await response.json();
+        const estimates = data.estimates || [];
+        
+        // Fetch user details for each estimate
+        const estimatesWithUsers = await Promise.all(
+          estimates.map(async (estimate: Estimate) => {
+            try {
+              const userResponse = await fetch(`/api/users/${estimate.userId}`);
+              if (userResponse.ok) {
+                const userData = await userResponse.json();
+                return { ...estimate, user: userData.user };
+              }
+            } catch (error) {
+              console.error('Error fetching user details:', error);
+            }
+            return estimate;
+          })
+        );
+        
+        setClientEstimates(estimatesWithUsers);
+      } catch (error) {
+        console.error('Error fetching client estimates:', error);
+        setClientEstimates([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClientEstimates();
+  }, [clientId]);
 
   const estimateTypes: EstimateType[] = [
     {
@@ -81,6 +153,8 @@ export default function EstimatesPage() {
   const handleBackToClients = () => {
     router.push('/dashboard/clients');
   };
+
+
 
   return (
     <div className="space-y-8">
@@ -153,23 +227,69 @@ export default function EstimatesPage() {
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Client Estimates */}
       <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg border border-white/20 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center justify-center p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer">
-            <Clock className="h-5 w-5 text-gray-600 mr-2" />
-            <span className="text-gray-700">View Recent Estimates</span>
-          </button>
-          <button className="flex items-center justify-center p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer">
-            <DollarSign className="h-5 w-5 text-gray-600 mr-2" />
-            <span className="text-gray-700">Pricing Templates</span>
-          </button>
-          <button className="flex items-center justify-center p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer">
-            <FileText className="h-5 w-5 text-gray-600 mr-2" />
-            <span className="text-gray-700">Estimate History</span>
-          </button>
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Client Estimates</h3>
+          <p className="text-gray-600 text-sm">
+            {clientName ? `Estimates for ${clientName}` : "Loading estimates..."}
+          </p>
         </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-3 text-gray-600">Loading estimates...</span>
+          </div>
+        ) : clientEstimates.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {clientEstimates.map((estimate) => (
+            <div
+              key={estimate._id}
+              onClick={() => router.push(`/dashboard/estimates/interior/${estimate._id}`)}
+              className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-200 cursor-pointer"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Home className="h-5 w-5 text-purple-600" />
+                </div>
+                <div className="text-xs text-gray-500">
+                  {estimate.createdAt ? new Date(estimate.createdAt).toLocaleDateString() : 'N/A'}
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <h4 className="font-semibold text-gray-900 text-lg mb-2">
+                  {estimate.estimateName}
+                </h4>
+                <p className="text-sm text-gray-600 mb-3">
+                  {estimate.items.length} items • Interior Estimate
+                </p>
+                {estimate.user && (
+                  <p className="text-xs text-gray-500">
+                    Created by: {estimate.user.name || estimate.user.email}
+                  </p>
+                )}
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="text-2xl font-bold text-gray-900">
+                  ₹{Math.round(estimate.totalAmount).toLocaleString()}
+                </div>
+                <div className="text-xs text-gray-500">
+                  Updated {estimate.updatedAt ? new Date(estimate.updatedAt).toLocaleDateString() : 'N/A'}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        ) : (
+          <div className="text-center py-8">
+            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h4 className="text-lg font-medium text-gray-900 mb-2">No estimates found</h4>
+            <p className="text-gray-600">This client doesn&apos;t have any estimates yet.</p>
+          </div>
+        )}
       </div>
     </div>
   );

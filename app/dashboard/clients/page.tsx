@@ -328,8 +328,8 @@ export default function ClientsPage() {
       {/* Loading State */}
       {loading && (
         <div className="text-center py-12">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg animate-spin">
-            <Users className="h-8 w-8 text-white" />
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
           </div>
           <p className="text-gray-600">Loading clients...</p>
         </div>
