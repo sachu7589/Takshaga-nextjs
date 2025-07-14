@@ -94,6 +94,7 @@ export default function InteriorEstimatePage() {
   const [showCustomItemModal, setShowCustomItemModal] = useState(false);
   const [editingItemData, setEditingItemData] = useState<Item | null>(null);
   const [showPresetModal, setShowPresetModal] = useState(false);
+  const [showCopyEstimateModal, setShowCopyEstimateModal] = useState(false);
   const [showMeasurementModal, setShowMeasurementModal] = useState(false);
   const [showEstimateNameModal, setShowEstimateNameModal] = useState(false);
   const [estimateName, setEstimateName] = useState("");
@@ -102,6 +103,8 @@ export default function InteriorEstimatePage() {
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
   const [presets, setPresets] = useState<Array<{id: string; name: string; items: Item[]; totalAmount: number}>>([]);
   const [presetsLoading, setPresetsLoading] = useState(false);
+  const [clientEstimates, setClientEstimates] = useState<Array<{_id: string; estimateName: string; items: Item[]; totalAmount: number; createdAt: string}>>([]);
+  const [estimatesLoading, setEstimatesLoading] = useState(false);
   const [customItem, setCustomItem] = useState({
     categoryId: "",
     categoryName: "",
@@ -735,6 +738,43 @@ export default function InteriorEstimatePage() {
     }
   };
 
+  const handleShowCopyEstimateModal = async () => {
+    if (!clientId) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Client ID is required to copy estimates',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      });
+      return;
+    }
+
+    setShowCopyEstimateModal(true);
+    setEstimatesLoading(true);
+    try {
+      const res = await fetch(`/api/interior-estimates/client/${clientId}`);
+      const data = await res.json();
+      setClientEstimates(Array.isArray(data.estimates) ? data.estimates : []);
+    } catch (error) {
+      console.error('Error fetching client estimates:', error);
+      setClientEstimates([]);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to fetch client estimates',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      });
+    } finally {
+      setEstimatesLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -762,18 +802,7 @@ export default function InteriorEstimatePage() {
             <span>Use Preset</span>
           </button>
           <button
-            onClick={() => {
-              // For now, just show a success message
-              Swal.fire({
-                icon: 'success',
-                title: 'Estimate Copied!',
-                text: 'Estimate has been copied successfully.',
-                position: 'top-end',
-                toast: true,
-                showConfirmButton: false,
-                timer: 2000
-              });
-            }}
+            onClick={handleShowCopyEstimateModal}
             className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer text-sm"
           >
             <Copy className="h-4 w-4" />
@@ -1841,6 +1870,65 @@ export default function InteriorEstimatePage() {
                       className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:bg-purple-50 transition-colors cursor-pointer text-gray-900 font-medium"
                     >
                       {preset.name}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Copy Estimate Modal */}
+      {showCopyEstimateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Copy Existing Estimate</h3>
+              <button
+                onClick={() => setShowCopyEstimateModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {estimatesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-3 text-gray-600">Loading estimates...</span>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {clientEstimates.length === 0 ? (
+                  <div className="text-gray-500 text-center py-6">No estimates found for this client.</div>
+                ) : (
+                  clientEstimates.map((estimate) => (
+                    <button
+                      key={estimate._id}
+                      onClick={() => {
+                        setItems(estimate.items || []);
+                        setShowCopyEstimateModal(false);
+                        Swal.fire({
+                          icon: 'success',
+                          title: 'Estimate Copied!',
+                          text: `Estimate "${estimate.estimateName}" has been copied to the current estimate.`,
+                          position: 'top-end',
+                          toast: true,
+                          showConfirmButton: false,
+                          timer: 2000
+                        });
+                      }}
+                      className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:bg-blue-50 transition-colors cursor-pointer text-gray-900 font-medium"
+                    >
+                      <div className="flex justify-between items-center">
+                        <span>{estimate.estimateName}</span>
+                        <span className="text-sm text-gray-500">
+                          ₹{estimate.totalAmount?.toLocaleString() || '0'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        {new Date(estimate.createdAt).toLocaleDateString()}
+                      </div>
                     </button>
                   ))
                 )}
