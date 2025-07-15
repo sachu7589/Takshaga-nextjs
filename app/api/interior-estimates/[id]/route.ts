@@ -11,26 +11,8 @@ export async function GET(
     // Await params in Next.js 15
     const { id } = await params;
     
-    // Get current user from token (check both Authorization header and cookies)
-    let currentUser = getCurrentUser(request);
-    
-    if (!currentUser) {
-      // Try to get token from cookies
-      const cookieStore = await cookies();
-      const tokenFromCookie = cookieStore.get('token')?.value;
-      
-      if (tokenFromCookie) {
-        const { verifyToken } = await import('@/app/lib/auth');
-        currentUser = verifyToken(tokenFromCookie);
-      }
-    }
-    
-    if (!currentUser) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Please login' },
-        { status: 401 }
-      );
-    }
+    // Allow public access for GET requests (for shared estimates)
+    // Authentication is not required for viewing estimates
 
     const mongoose = await dbConnect();
     if (!mongoose.connection.db) {

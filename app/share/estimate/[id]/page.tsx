@@ -2,15 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import Image from "next/image";
 import { 
-  Download,
-  Share2,
   Copy,
   Phone,
   Mail,
   Globe,
   MapPin,
-  Building,
   Calendar,
   Package,
   User,
@@ -116,94 +114,9 @@ export default function PublicEstimatePage() {
     fetchEstimateDetails();
   }, [estimateId]);
 
-  const handleDownloadEstimate = () => {
-    if (!estimate || !clientDetails) return;
+  // Download functionality removed as it's not being used
 
-    // Calculate subtotal and discount
-    const subtotal = estimate.items.reduce((sum, item) => sum + item.totalAmount, 0);
-    const discountAmount = estimate.discount && estimate.discount > 0 
-      ? (estimate.discountType === 'percentage' 
-          ? (subtotal * estimate.discount) / 100 
-          : estimate.discount)
-      : 0;
-
-    // Create professional estimate content
-    const estimateContent = `
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                              INTERIOR ESTIMATE                               ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-
-ESTIMATE DETAILS:
-─────────────────────────────────────────────────────────────────────────────────
-Estimate Name: ${estimate.estimateName}
-Created Date: ${new Date(estimate.createdAt).toLocaleDateString()}
-Estimate ID: ${estimate._id}
-
-CLIENT INFORMATION:
-─────────────────────────────────────────────────────────────────────────────────
-Name: ${clientDetails.name}
-Email: ${clientDetails.email}
-Phone: ${clientDetails.phone}
-Location: ${clientDetails.location}
-
-ESTIMATE ITEMS:
-─────────────────────────────────────────────────────────────────────────────────
-${estimate.items.map((item, index) => {
-  const itemNumber = (index + 1).toString().padStart(2, '0');
-  const itemName = item.materialName.padEnd(30);
-  
-  let dimensions = '';
-  if (item.type === 'area') {
-    dimensions = `${item.length}cm x ${item.breadth}cm`;
-  } else if (item.type === 'pieces') {
-    dimensions = `${item.pieces} pieces`;
-  } else if (item.type === 'running') {
-    dimensions = `${item.runningLength}cm running`;
-  }
-  
-  return `${itemNumber}. ${itemName} | ${dimensions}
-        Description: ${item.description}
-        Amount: ₹${item.totalAmount.toFixed(2)}
-`;
-}).join('')}
-
-SUMMARY:
-─────────────────────────────────────────────────────────────────────────────────
-Subtotal: ₹${subtotal.toFixed(2)}
-${estimate.discount && estimate.discount > 0 ? `Discount (${estimate.discountType === 'percentage' ? `${estimate.discount}%` : `₹${estimate.discount}`}): -₹${discountAmount.toFixed(2)}` : ''}
-─────────────────────────────────────────────────────────────────────────────────
-GRAND TOTAL: ₹${estimate.totalAmount.toFixed(2)}
-─────────────────────────────────────────────────────────────────────────────────
-
-Generated on: ${new Date().toLocaleString()}
-Shared via: ${window.location.origin}
-    `.trim();
-
-    // Create and download file
-    const blob = new Blob([estimateContent], { type: 'text/plain; charset=utf-8' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${estimate.estimateName.replace(/[^a-zA-Z0-9]/g, '_')}_estimate.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-
-    Swal.fire({
-      icon: 'success',
-      title: 'Estimate Downloaded!',
-      text: 'Your estimate has been downloaded successfully.',
-      position: 'top-end',
-      toast: true,
-      showConfirmButton: false,
-      timer: 2000
-    });
-  };
-
-  const handleShareEstimate = () => {
-    setShowShareModal(true);
-  };
+  // Share functionality removed as it's not being used
 
   const handleWhatsAppShare = () => {
     if (!estimate || !clientDetails) return;
@@ -279,35 +192,21 @@ View full estimate: ${window.location.href}`;
         {/* Company Header */}
         <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-8 text-white">
-            <div className="flex flex-col md:flex-row items-center justify-between">
-              <div className="flex items-center space-x-4 mb-4 md:mb-0">
+            <div className="flex flex-col md:flex-row items-center justify-center">
+              <div className="flex items-center space-x-4">
                 <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                  <img 
+                  <Image 
                     src="/logoclr.png" 
                     alt="Takshaga Spatial Solutions Logo" 
-                    className="w-12 h-12 object-contain"
+                    width={48}
+                    height={48}
+                    className="object-contain"
                   />
                 </div>
                 <div>
                   <h1 className="text-3xl md:text-4xl font-bold">Takshaga Spatial Solutions</h1>
                   <p className="text-blue-100 text-lg">Interior Design & Construction</p>
                 </div>
-              </div>
-              <div className="flex space-x-3">
-                <button
-                  onClick={handleDownloadEstimate}
-                  className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-xl hover:bg-white/30 transition-all duration-300 cursor-pointer text-sm font-medium"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Download</span>
-                </button>
-                <button
-                  onClick={handleShareEstimate}
-                  className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-xl hover:bg-white/30 transition-all duration-300 cursor-pointer text-sm font-medium"
-                >
-                  <Share2 className="h-4 w-4" />
-                  <span>Share</span>
-                </button>
               </div>
             </div>
           </div>
@@ -577,8 +476,16 @@ View full estimate: ${window.location.href}`;
 
         {/* Footer */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <Building className="w-6 h-6 text-blue-600" />
+          <div className="flex items-center justify-center space-x-3 mb-4">
+            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center overflow-hidden">
+              <Image 
+                src="/logoclr.png" 
+                alt="Takshaga Spatial Solutions Logo" 
+                width={24}
+                height={24}
+                className="object-contain"
+              />
+            </div>
             <h3 className="text-xl font-bold text-gray-900">Takshaga Spatial Solutions</h3>
           </div>
           <p className="text-gray-600 mb-4">Transforming spaces with innovative interior solutions</p>

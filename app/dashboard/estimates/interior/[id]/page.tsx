@@ -14,6 +14,8 @@ import {
   Share2
 } from "lucide-react";
 import Swal from 'sweetalert2';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Category {
   id: string;
@@ -497,85 +499,448 @@ export default function InteriorEstimateDetailsPage() {
   const handleDownloadEstimate = () => {
     if (!estimate || !clientDetails) return;
 
-    // Calculate subtotal and discount
-    const subtotal = estimate.items.reduce((sum, item) => sum + item.totalAmount, 0);
-    const discountAmount = estimate.discount && estimate.discount > 0 
-      ? (estimate.discountType === 'percentage' 
-          ? (subtotal * estimate.discount) / 100 
-          : estimate.discount)
-      : 0;
+    try {
+      const doc = new jsPDF();
+      
+      // Add full page border - only 4 sides
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+      doc.rect(5, 5, 200, 287);
+      
+      // Add professional header background with gradient effect
+      doc.setFillColor(0, 51, 102); // Dark blue
+      doc.rect(5, 5, 200, 45, 'F');
+      doc.setFillColor(0, 71, 142); // Lighter blue for accent
+      doc.rect(5, 45, 200, 20, 'F');
+      
+      // Add company details on left side with professional styling
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Takshaga Spatial Solutions", 15, 20);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text("2nd Floor, Opp. Panchayat Building", 15, 30);
+      doc.text("Upputhara P.O, Idukki District", 15, 35);
+      doc.text("Kerala – 685505, India", 15, 40);
 
-    // Create professional estimate content
-    const estimateContent = `
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                              INTERIOR ESTIMATE                               ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+      // Add logo on right side
+      const logoUrl = '/logo.png';
+      try {
+        doc.addImage(logoUrl, 'PNG', 155, 8, 50, 50);
+      } catch {
+        console.log('Logo not found, continuing without logo');
+      }
 
-ESTIMATE DETAILS:
-─────────────────────────────────────────────────────────────────────────────────
-Estimate Name: ${estimate.estimateName}
-Created Date: ${new Date(estimate.createdAt).toLocaleDateString()}
-Estimate ID: ${estimate._id}
+      // Add contact details in light blue area
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Website: www.takshaga.com", 105, 52, { align: 'center' });
+      doc.text("Email: info@takshaga.com", 105, 57, { align: 'center' });
+      doc.text("+91 98466 60624 | +91 95443 44332", 105, 62, { align: 'center' });
+      
+      // Add professional estimate details section
+      doc.setFillColor(245, 245, 245);
+      doc.roundedRect(5, 75, 200, 45, 2, 2, 'F');
+      
+      // Add estimate details on left in a structured format
+      doc.setTextColor(0);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("ESTIMATE DETAILS", 15, 85);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Estimate No: EST-${new Date(estimate.createdAt).getFullYear()}-${String(estimate._id).slice(-6).toUpperCase()}`, 15, 95);
+      doc.text(`Date: ${new Date(estimate.createdAt).toLocaleDateString()}`, 15, 105);
+      
+      // Add client details on right with better structure
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("BILL TO", 110, 85);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(clientDetails.name, 110, 95);
+      doc.text(clientDetails.location || "", 110, 105);
+      
+      // Add ESTIMATE heading with professional styling
+      doc.setFillColor(0, 51, 102);
+      doc.rect(5, 130, 200, 12, 'F');
+      doc.setFontSize(14);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text("ESTIMATE", 105, 138, { align: "center" });
 
-CLIENT INFORMATION:
-─────────────────────────────────────────────────────────────────────────────────
-Name: ${clientDetails.name}
-Email: ${clientDetails.email}
-Phone: ${clientDetails.phone}
-Location: ${clientDetails.location}
+      let yPos = 150;
+      const pageEndY = 280;
+      const minSpaceNeeded = 50;
+      const categorySpacing = 20;
+      const subcategorySpacing = 15;
 
-ESTIMATE ITEMS:
-─────────────────────────────────────────────────────────────────────────────────
-${estimate.items.map((item, index) => {
-  const itemNumber = (index + 1).toString().padStart(2, '0');
-  const itemName = item.materialName.padEnd(30);
-  let dimensions = '';
-  if (item.type === 'area') {
-    dimensions = `${item.length}cm x ${item.breadth}cm`;
-  } else if (item.type === 'pieces') {
-    dimensions = `${item.pieces} pieces`;
-  } else if (item.type === 'running') {
-    dimensions = `${item.runningLength}cm running`;
-  }
-  
-  return `${itemNumber}. ${itemName} | ${dimensions}
-        Description: ${item.description}
-        Amount: ₹${item.totalAmount.toFixed(2)}
-`;
-}).join('')}
+      // Organize items by category and subcategory
+      const organizedSections: Record<string, Record<string, Item[]>> = {};
+      estimate.items.forEach(item => {
+        const categoryName = item.categoryName || 'Uncategorized';
+        const subcategoryName = item.subCategoryName || 'Other';
+        if (!organizedSections[categoryName]) {
+          organizedSections[categoryName] = {};
+        }
+        if (!organizedSections[categoryName][subcategoryName]) {
+          organizedSections[categoryName][subcategoryName] = [];
+        }
+        organizedSections[categoryName][subcategoryName].push(item);
+      });
 
-SUMMARY:
-─────────────────────────────────────────────────────────────────────────────────
-Subtotal: ₹${subtotal.toFixed(2)}
-${estimate.discount && estimate.discount > 0 ? `Discount (${estimate.discountType === 'percentage' ? `${estimate.discount}%` : `₹${estimate.discount}`}): -₹${discountAmount.toFixed(2)}` : ''}
-─────────────────────────────────────────────────────────────────────────────────
-GRAND TOTAL: ₹${estimate.totalAmount.toFixed(2)}
-─────────────────────────────────────────────────────────────────────────────────
+      Object.entries(organizedSections).forEach(([category, subcategories]) => {
+        Object.entries(subcategories).forEach(([subcategory, items], subIndex) => {
+          const estimatedTableHeight = items.length * 12 + subcategorySpacing;
+          const totalBlockHeight = estimatedTableHeight + 20;
 
-Generated on: ${new Date().toLocaleString()}
-Shared via: ${window.location.origin}
-    `.trim();
+          const remainingSpace = pageEndY - yPos;
+          if (remainingSpace < totalBlockHeight || (subIndex === 0 && remainingSpace < minSpaceNeeded)) {
+            doc.addPage();
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(5, 5, 200, 287);
+            yPos = 20;
+          }
 
-    // Create and download file
-    const blob = new Blob([estimateContent], { type: 'text/plain; charset=utf-8' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${estimate.estimateName.replace(/[^a-zA-Z0-9]/g, '_')}_estimate.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+          if (subIndex === 0) {
+            yPos += 5;
+            doc.setFillColor(0, 51, 102);
+            doc.rect(10, yPos - 5, 190, 10, 'F');
+            doc.setFontSize(11);
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.text(category, 20, yPos);
+            yPos += categorySpacing;
+          }
+
+          doc.setFillColor(236, 240, 241);
+          doc.rect(15, yPos - 5, 180, 8, 'F');
+          doc.setFontSize(10);
+          doc.setTextColor(44, 62, 80);
+          doc.text(subcategory, 25, yPos);
+          yPos += 10;
+
+          // Generate table based on item type
+          const getTableStructure = (items: Item[]) => {
+            if (!items || items.length === 0) {
+              throw new Error('No items to generate table structure');
+            }
+            const firstItem = items[0];
+            
+            if (firstItem.type === 'area') {
+              // Area type: Description, Measurement, Sq Feet, Amount per sq ft, Total
+              const tableData = items.map(item => {
+                const descriptionText = item.description || '';
+                const materialText = item.materialName || '';
+                let combinedText = descriptionText;
+                if (materialText) {
+                  combinedText = descriptionText ? `${descriptionText}\nMaterial: ${materialText}` : `Material: ${materialText}`;
+                }
+
+                // Handle multiple measurements - match page display logic
+                let measurements = '';
+                let totalSqFeet = 0;
+                
+
+                
+                if (item.measurements && item.measurements.length > 0) {
+                  // Include item-level dimensions first, then measurements array (matching page display)
+                  const measurementStrings = [];
+                  
+                  // Add item-level dimensions if they exist
+                  if (item.length && item.breadth) {
+                    measurementStrings.push(`${item.length}×${item.breadth}`);
+                    totalSqFeet += (item.length * item.breadth) / 929.03;
+                  }
+                  
+                  // Add measurements array
+                  item.measurements.forEach((m) => {
+                    measurementStrings.push(`${m.length}×${m.breadth}`);
+                    totalSqFeet += (m.length * m.breadth) / 929.03;
+                  });
+                  
+                  measurements = measurementStrings.join('\n');
+                } else if (item.length && item.breadth) {
+                  measurements = `${item.length}×${item.breadth}`;
+                  totalSqFeet = (item.length * item.breadth) / 929.03;
+                }
+
+                const amountPerSqFt = totalSqFeet > 0 ? item.totalAmount / totalSqFeet : 0;
+                
+                const row = [
+                  combinedText,
+                  measurements,
+                  totalSqFeet.toFixed(1),
+                  `Rs ${amountPerSqFt.toFixed(1)}`,
+                  `Rs ${item.totalAmount.toFixed(1)}`
+                ];
+                
+                return row;
+              });
+
+              return {
+                head: [['Description', 'Measurement', 'Sq Feet', 'Amount per sq ft', 'Total']],
+                body: tableData,
+                columnStyles: {
+                  "0": { cellWidth: 70 },
+                  "1": { cellWidth: 30 },
+                  "2": { cellWidth: 25 },
+                  "3": { cellWidth: 30 },
+                  "4": { cellWidth: 25 }
+                }
+              };
+            } else if (firstItem.type === 'pieces') {
+              // Pieces type: Description, No of Pieces, Amount per piece, Total
+              const tableData = items.map(item => {
+                const descriptionText = item.description || '';
+                const materialText = item.materialName || '';
+                let combinedText = descriptionText;
+                if (materialText) {
+                  combinedText = descriptionText ? `${descriptionText}\nMaterial: ${materialText}` : `Material: ${materialText}`;
+                }
+
+                const quantity = item.pieces || 1;
+                const amountPerPiece = item.totalAmount / quantity;
+                
+                return [
+                  combinedText,
+                  quantity.toString(),
+                  `Rs ${amountPerPiece.toFixed(1)}`,
+                  `Rs ${item.totalAmount.toFixed(1)}`
+                ];
+              });
+
+              return {
+                head: [['Description', 'No of Pieces', 'Amount per piece', 'Total']],
+                body: tableData,
+                columnStyles: {
+                  "0": { cellWidth: 90 },
+                  "1": { cellWidth: 30 },
+                  "2": { cellWidth: 35 },
+                  "3": { cellWidth: 25 },
+                  "4": { cellWidth: 0 } // Dummy property to match type signature
+                }
+              };
+            } else if (firstItem.type === 'running' || firstItem.type === 'running_sq_feet') {
+              // Running type: Description, Length, Feet, Amount per ft, Total
+              const tableData = items.map(item => {
+                const descriptionText = item.description || '';
+                const materialText = item.materialName || '';
+                let combinedText = descriptionText;
+                if (materialText) {
+                  combinedText = descriptionText ? `${descriptionText}\nMaterial: ${materialText}` : `Material: ${materialText}`;
+                }
+
+                // Handle multiple running measurements - match page display logic
+                let lengths = '';
+                let totalLength = 0;
+                
+                if (item.runningMeasurements && item.runningMeasurements.length > 0) {
+                  // Include item-level runningLength first, then runningMeasurements array (matching page display)
+                  const lengthStrings = [];
+                  
+                  // Add item-level runningLength if it exists
+                  if (item.runningLength) {
+                    lengthStrings.push(item.runningLength.toString());
+                    totalLength += item.runningLength;
+                  }
+                  
+                  // Add runningMeasurements array
+                  item.runningMeasurements.forEach((m) => {
+                    lengthStrings.push(m.length.toString());
+                    totalLength += m.length;
+                  });
+                  
+                  lengths = lengthStrings.join('\n');
+                } else if (item.runningLength) {
+                  lengths = item.runningLength.toString();
+                  totalLength = item.runningLength;
+                }
+
+                const totalFeet = totalLength / 30.48;
+                const amountPerFt = totalFeet > 0 ? item.totalAmount / totalFeet : 0;
+                
+                const row = [
+                  combinedText,
+                  lengths,
+                  totalFeet.toFixed(1),
+                  `Rs ${amountPerFt.toFixed(1)}`,
+                  `Rs ${item.totalAmount.toFixed(1)}`
+                ];
+                
+                return row;
+              });
+
+              return {
+                head: [['Description', 'Length', 'Feet', 'Amount per ft', 'Total']],
+                body: tableData,
+                columnStyles: {
+                  "0": { cellWidth: 70 },
+                  "1": { cellWidth: 30 },
+                  "2": { cellWidth: 25 },
+                  "3": { cellWidth: 30 },
+                  "4": { cellWidth: 25 }
+                }
+              };
+            } else {
+              throw new Error('Unknown item type for table structure');
+            }
+          };
+
+          const tableStructure = getTableStructure(items);
+          
+          autoTable(doc, {
+            startY: yPos,
+            head: tableStructure.head,
+            body: tableStructure.body,
+            theme: 'grid',
+            headStyles: {
+              fillColor: [248, 250, 252],
+              textColor: [0, 0, 0],
+              fontStyle: 'bold'
+            },
+            bodyStyles: {
+              fillColor: [255, 255, 255],
+              textColor: [0, 0, 0]
+            },
+            styles: { fontSize: 8, cellPadding: 2 },
+            margin: { left: 15, right: 15 },
+            columnStyles: tableStructure.columnStyles,
+            didDrawCell: function(data) {
+              // Handle multi-line text in cells
+              if (data.section === 'body') {
+                if (data.column.index === 1) {
+                  // Measurement/Length column - ensure proper line breaks
+                  let cellValue = '';
+                  if (Array.isArray(data.cell.text)) {
+                    cellValue = data.cell.text.join('\n');
+                  } else if (typeof data.cell.text === 'string') {
+                    cellValue = data.cell.text;
+                  } else if (data.cell.text !== null && data.cell.text !== undefined) {
+                    cellValue = String(data.cell.text);
+                  } else {
+                    cellValue = '';
+                  }
+                  
+                  // Split by newlines to ensure all measurements are shown
+                  if (cellValue.includes('×') || cellValue.includes('\n')) {
+                    const lines = cellValue.split('\n').filter(line => line.trim() !== '');
+                    data.cell.text = lines;
+                  }
+                }
+              }
+            }
+          });
+          
+          yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+        });
+      });
+
+      const subTotal = estimate.items.reduce((total, item) => {
+        return total + parseFloat(item.totalAmount.toString() || '0');
+      }, 0);
+
+      if (pageEndY - yPos < 40) {
+        doc.addPage();
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
+        yPos = 20;
+      }
+
+      doc.setDrawColor(189, 195, 199);
+      doc.setLineWidth(0.5);
+      doc.line(20, yPos, 190, yPos);
+      yPos += 8;
+      
+      doc.setFontSize(10);
+      doc.setTextColor(44, 62, 80);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Sub Total:`, 149, yPos);
+      doc.text(`Rs ${subTotal.toFixed(2)}`, 191, yPos, { align: 'right' });
+      
+      if (estimate.discount && estimate.discount > 0) {
+        yPos += 7;
+        const discountAmount = estimate.discountType === 'percentage' 
+          ? (subTotal * estimate.discount) / 100 
+          : estimate.discount;
+        doc.text(`Discount:`, 149, yPos);
+        doc.text(`- Rs ${discountAmount.toFixed(2)}`, 191, yPos, { align: 'right' });
+      }
+      
+      yPos += 7;
+      doc.setFontSize(12);
+      doc.text(`Grand Total:`, 135, yPos);
+      doc.text(`Rs ${estimate.totalAmount.toFixed(2)}`, 191, yPos, { align: 'right' });
+
+      yPos += 15;
+      doc.setFillColor(0, 51, 102);
+      doc.rect(10, yPos - 5, 190, 10, 'F');
+      doc.setFontSize(12);
+      doc.setTextColor(255, 255, 255);
+      doc.text("Notes & Terms", 20, yPos);
+      yPos += 12;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(44, 62, 80);
+
+      const standardTerms = [
+        "• Price includes materials, transport, labor and service",
+        "• 50% payment needed upfront with order",
+        "• 25% payment after basic structure work",
+        "• Final 25% payment after finishing work",
+        "• Extra work costs extra"
+      ];
+
+      standardTerms.forEach(term => {
+        doc.text(term, 25, yPos);
+        yPos += 7;
+      });
+
+      yPos += 12;
+      doc.line(20, yPos, 80, yPos);
+      doc.line(120, yPos, 180, yPos);
+      yPos += 7;
+      doc.setFontSize(10);
+      doc.text("Customer Signature", 20, yPos);
+      doc.text("For Takshaga", 120, yPos);
+
+      const pageCount = (doc.internal as unknown as { getNumberOfPages: () => number }).getNumberOfPages();
+      for(let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
+        doc.setFontSize(8);
+        doc.setTextColor(44, 62, 80);
+        doc.text(`Page ${i} of ${pageCount}`, 105, 290, { align: 'center' });
+      }
+
+      const fileName = `${clientDetails.name.trim().replace(/\s+/g, '_')}_estimate.pdf`;
+      doc.save(fileName);
 
     Swal.fire({
       icon: 'success',
-      title: 'Estimate Downloaded!',
-      text: 'Your estimate has been downloaded successfully.',
+        title: 'PDF Downloaded!',
+        text: 'Your professional estimate has been downloaded successfully.',
       position: 'top-end',
       toast: true,
       showConfirmButton: false,
       timer: 2000
     });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to generate PDF',
+        icon: 'error',
+        confirmButtonText: 'OK'
+      });
+    }
   };
 
   const handleShareEstimate = () => {
@@ -585,12 +950,30 @@ Shared via: ${window.location.origin}
   const handleWhatsAppShare = () => {
     if (!estimate || !clientDetails) return;
 
-    const message = `Interior Estimate - ${estimate.estimateName}
+    const message = `*Greetings from Takshaga Spatial Solutions*
 
-Client: ${clientDetails.name}
-Total Amount: ₹${estimate.totalAmount.toFixed(2)}
+Dear ${clientDetails.name},
 
-View full estimate: ${window.location.origin}/share/estimate/${estimateId}`;
+Thank you for choosing *Takshaga Spatial Solutions* for your interior design project. We are pleased to present your detailed estimate.
+
+*Estimate Summary:*
+• Total Amount: ₹${estimate.totalAmount.toFixed(0)}
+• Items Included: ${estimate.items.length} categories
+
+*View Complete Estimate:*
+${window.location.origin}/share/estimate/${estimateId}
+
+*Takshaga Spatial Solutions*
+Interior Design & Construction
+Address: 2nd Floor, Opp. Panchayat Building, Upputhara P.O, Idukki District, Kerala – 685505
+Website: www.takshaga.com
+Email: info@takshaga.com
+Contact: Jinto Jose: +91 98466 60624
+Contact: Saneesh: +91 9544344332
+
+We look forward to bringing your vision to life!
+
+*Thank you for your trust in our expertise.*`;
 
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');

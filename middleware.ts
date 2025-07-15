@@ -6,6 +6,12 @@ export function middleware(request: NextRequest) {
 
   // Public routes that don't require authentication
   const publicRoutes = ['/', '/register'];
+  
+  // Allow public access to share estimate pages
+  if (pathname.startsWith('/share/estimate/')) {
+    return NextResponse.next();
+  }
+  
   if (publicRoutes.includes(pathname)) {
     return NextResponse.next();
   }
