@@ -79,6 +79,15 @@ export default function PublicEstimatePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // Measurement calculation functions (same as dashboard)
+  const cmToSqFeet = (lengthCm: number, breadthCm: number): number => {
+    return (lengthCm * breadthCm) / 929.03;
+  };
+
+  const cmToFeet = (cm: number): number => {
+    return cm / 30.48;
+  };
   
   // Fetch estimate details
   useEffect(() => {
@@ -113,10 +122,6 @@ export default function PublicEstimatePage() {
 
     fetchEstimateDetails();
   }, [estimateId]);
-
-  // Download functionality removed as it's not being used
-
-  // Share functionality removed as it's not being used
 
   const handleWhatsAppShare = () => {
     if (!estimate || !clientDetails) return;
@@ -423,42 +428,123 @@ View full estimate: ${window.location.href}`;
                                   {categoryItems.some(i => i.type === 'area') && (
                                     <>
                                       <td className="py-3 px-4 text-sm text-gray-600">
-                                        {item.type === 'area' ? item.length : '-'}
+                                        {item.type === 'area' ? (
+                                          item.measurements && item.measurements.length > 0 ? (
+                                            <div className="space-y-1">
+                                              <div className="text-center">{item.length || 0}</div>
+                                              {item.measurements.map((measurement) => (
+                                                <div key={measurement.id} className="text-center text-xs text-gray-500">
+                                                  {measurement.length}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="text-center">{item.length || 0}</div>
+                                          )
+                                        ) : '-'
+                                      }
+                                      </td>
+                                      <td className="py-3 px-4 text-sm text-gray-600">-</td>
+                                      <td className="py-3 px-4 text-sm text-gray-600">
+                                        {item.type === 'area' ? (
+                                          item.measurements && item.measurements.length > 0 ? (
+                                            <div className="space-y-1">
+                                              <div className="text-center">{item.breadth || 0}</div>
+                                              {item.measurements.map((measurement) => (
+                                                <div key={measurement.id} className="text-center text-xs text-gray-500">
+                                                  {measurement.breadth}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="text-center">{item.breadth || 0}</div>
+                                          )
+                                        ) : '-'
+                                      }
                                       </td>
                                       <td className="py-3 px-4 text-sm text-gray-600">
-                                        {item.type === 'area' ? 'x' : '-'}
-                                      </td>
-                                      <td className="py-3 px-4 text-sm text-gray-600">
-                                        {item.type === 'area' ? item.breadth : '-'}
-                                      </td>
-                                      <td className="py-3 px-4 text-sm text-gray-600">
-                                        {item.type === 'area' ? ((item.length || 0) * (item.breadth || 0) / 929.03).toFixed(2) : '-'}
+                                        {item.type === 'area' ? (
+                                          <div className="text-center">
+                                            {(() => {
+                                              const singleSqFeet = cmToSqFeet(item.length || 0, item.breadth || 0);
+                                              const measurementsSqFeet = item.measurements ? 
+                                                item.measurements.reduce((total, m) => total + cmToSqFeet(m.length, m.breadth), 0) : 0;
+                                              const total = singleSqFeet + measurementsSqFeet;
+                                              return total.toFixed(1);
+                                            })()}
+                                          </div>
+                                        ) : '-'
+                                      }
                                       </td>
                                     </>
                                   )}
                                   {categoryItems.some(i => i.type === 'pieces') && (
                                     <td className="py-3 px-4 text-sm text-gray-600">
-                                      {item.type === 'pieces' ? item.pieces : '-'}
+                                      {item.type === 'pieces' ? (
+                                        <div className="text-center">{item.pieces}</div>
+                                      ) : '-'
+                                    }
                                     </td>
                                   )}
                                   {categoryItems.some(i => i.type === 'running') && (
                                     <>
                                       <td className="py-3 px-4 text-sm text-gray-600">
-                                        {item.type === 'running' ? item.runningLength : '-'}
+                                        {item.type === 'running' ? (
+                                          item.runningMeasurements && item.runningMeasurements.length > 0 ? (
+                                            <div className="space-y-1">
+                                              <div className="text-center">{item.runningLength || 0}</div>
+                                              {item.runningMeasurements.map((measurement) => (
+                                                <div key={measurement.id} className="text-center text-xs text-gray-500">
+                                                  {measurement.length}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="text-center">{item.runningLength || 0}</div>
+                                          )
+                                        ) : '-'
+                                      }
                                       </td>
+                                      <td className="py-3 px-4 text-sm text-gray-600">-</td>
                                       <td className="py-3 px-4 text-sm text-gray-600">
-                                        {item.type === 'running' ? '=' : '-'}
-                                      </td>
-                                      <td className="py-3 px-4 text-sm text-gray-600">
-                                        {item.type === 'running' ? ((item.runningLength || 0) / 30.48).toFixed(2) : '-'}
+                                        {item.type === 'running' ? (
+                                          <div className="text-center">
+                                            {(() => {
+                                              const singleFeet = cmToFeet(item.runningLength || 0);
+                                              const measurementsFeet = item.runningMeasurements ? 
+                                                item.runningMeasurements.reduce((total, m) => total + cmToFeet(m.length), 0) : 0;
+                                              const total = singleFeet + measurementsFeet;
+                                              return total.toFixed(1);
+                                            })()}
+                                          </div>
+                                        ) : '-'
+                                      }
                                       </td>
                                     </>
                                   )}
                                   <td className="py-3 px-4 text-sm text-gray-600">
-                                    ₹{item.totalAmount.toFixed(2)}
+                                    <div className="text-center">
+                                      ₹{(() => {
+                                        let amount = 0;
+                                        if (item.type === 'area') {
+                                          const sqFeet = cmToSqFeet(item.length || 0, item.breadth || 0);
+                                          const measurementsSqFeet = item.measurements ? 
+                                            item.measurements.reduce((total, m) => total + cmToSqFeet(m.length, m.breadth), 0) : 0;
+                                          const totalSqFeet = sqFeet + measurementsSqFeet;
+                                          amount = totalSqFeet > 0 ? (item.totalAmount / totalSqFeet) : 0;
+                                        } else if (item.type === 'pieces') {
+                                          amount = (item.pieces || 0) > 0 ? (item.totalAmount / (item.pieces || 1)) : 0;
+                                        } else {
+                                          amount = item.totalAmount;
+                                        }
+                                        return isFinite(amount) ? amount.toFixed(1) : '0.0';
+                                      })().toLocaleString()}
+                                    </div>
                                   </td>
                                   <td className="py-3 px-4 text-sm font-semibold text-gray-900">
-                                    ₹{item.totalAmount.toFixed(2)}
+                                    <div className="text-center">
+                                      ₹{item.totalAmount.toFixed(1)}
+                                    </div>
                                   </td>
                                 </tr>
                               ))}
