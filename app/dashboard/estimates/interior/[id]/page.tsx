@@ -926,7 +926,7 @@ export default function InteriorEstimateDetailsPage() {
     Swal.fire({
       icon: 'success',
         title: 'PDF Downloaded!',
-        text: 'Your professional estimate has been downloaded successfully.',
+        text: 'Your estimate has been downloaded successfully.',
       position: 'top-end',
       toast: true,
       showConfirmButton: false,
