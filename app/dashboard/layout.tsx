@@ -11,7 +11,8 @@ import {
   User,
   Settings,
   Bell,
-  Palette
+  Palette,
+  MessageSquare
 } from "lucide-react";
 import Image from "next/image";
 
@@ -88,6 +89,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       icon: Users,
       href: "/dashboard/clients",
       active: pathname === "/dashboard/clients" || pathname.startsWith("/dashboard/estimates")
+    },
+    {
+      name: "Enquiries",
+      icon: MessageSquare,
+      href: "/dashboard/enquiries",
+      active: pathname === "/dashboard/enquiries"
     },
     {
       name: "Sections",
