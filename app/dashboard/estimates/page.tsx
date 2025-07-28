@@ -44,7 +44,7 @@ interface Estimate {
   totalAmount: number;
   discount?: number;
   discountType?: 'percentage' | 'fixed';
-  status?: 'pending' | 'approved';
+  status?: 'pending' | 'approved' | 'completed';
   createdAt: string;
   updatedAt: string;
   user?: User;
@@ -247,7 +247,13 @@ export default function EstimatesPage() {
           {clientEstimates.map((estimate) => (
             <div
               key={estimate._id}
-              onClick={() => router.push(`/dashboard/estimates/interior/${estimate._id}`)}
+              onClick={() => {
+                if (estimate.status === 'completed') {
+                  router.push(`/dashboard/interior-work/completed/${estimate._id}/details`);
+                } else {
+                  router.push(`/dashboard/estimates/interior/${estimate._id}`);
+                }
+              }}
               className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-200 cursor-pointer"
             >
               <div className="flex items-start justify-between mb-4">
@@ -267,9 +273,11 @@ export default function EstimatesPage() {
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     estimate.status === 'approved' 
                       ? 'bg-green-100 text-green-800' 
+                      : estimate.status === 'completed'
+                      ? 'bg-blue-100 text-blue-800'
                       : 'bg-yellow-100 text-yellow-800'
                   }`}>
-                    {estimate.status === 'approved' ? 'Approved' : 'Pending'}
+                    {estimate.status === 'approved' ? 'Approved' : estimate.status === 'completed' ? 'Completed' : 'Pending'}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 mb-3">
