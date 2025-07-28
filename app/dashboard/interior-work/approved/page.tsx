@@ -29,10 +29,10 @@ interface Item {
   type: 'area' | 'pieces' | 'running' | 'running_sq_feet';
   length?: number;
   breadth?: number;
-  measurements?: any[];
+  measurements?: { length: number; breadth: number }[];
   pieces?: number;
   runningLength?: number;
-  runningMeasurements?: any[];
+  runningMeasurements?: { length: number }[];
   description: string;
   totalAmount: number;
 }

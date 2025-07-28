@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Calendar, Edit, Trash2, Download } from 'lucide-react';
 import Swal from 'sweetalert2';
@@ -38,13 +38,7 @@ export default function InteriorPresetDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedPreset, setEditedPreset] = useState<InteriorPreset | null>(null);
 
-  useEffect(() => {
-    if (params.id) {
-      fetchPreset(params.id as string);
-    }
-  }, [params.id]);
-
-  const fetchPreset = async (presetId: string) => {
+  const fetchPreset = useCallback(async (presetId: string) => {
     try {
       setLoading(true);
       const response = await fetch(`/api/interior-presets/${presetId}`);
@@ -80,7 +74,13 @@ export default function InteriorPresetDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    if (params.id) {
+      fetchPreset(params.id as string);
+    }
+  }, [params.id, fetchPreset]);
 
   const handleEditPreset = () => {
     if (isEditing) {

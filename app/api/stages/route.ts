@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get('clientId');
 
     // Build query filter
-    const filter: any = {};
+    const filter: { clientId?: string } = {};
     if (clientId) {
       filter.clientId = clientId;
     }

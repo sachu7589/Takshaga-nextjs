@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   CheckCircle,
   DollarSign,
-  Calendar,
   User,
   Phone,
   Mail,
@@ -21,8 +20,8 @@ import {
   Play
 } from "lucide-react";
 import Swal from 'sweetalert2';
+import type { SweetAlertOptions } from 'sweetalert2';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 interface Stage {
   _id: string;
@@ -95,8 +94,7 @@ export default function ApprovedWorkDetailsPage() {
   const [interiorIncomes, setInteriorIncomes] = useState<InteriorIncome[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState<number>(0);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<{ userId: string; name: string; email: string } | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -160,10 +158,10 @@ export default function ApprovedWorkDetailsPage() {
             const userData = await userResponse.json();
             setCurrentUser(userData.user);
           }
-        } catch (error) {
+        } catch {
           console.log('Could not fetch current user, using default');
           // Set a default user if we can't fetch the current user
-          setCurrentUser({ name: 'Current User', email: 'user@example.com' });
+          setCurrentUser({ userId: 'default', name: 'Current User', email: 'user@example.com' });
         }
 
         // Fetch expenses for this client
@@ -226,7 +224,7 @@ export default function ApprovedWorkDetailsPage() {
     
     // Client Info
     doc.text('Bill To:', 120, 90);
-    if (estimate.client) {
+    if (estimate?.client) {
       doc.text(estimate.client.name, 120, 100);
       doc.text(estimate.client.email, 120, 110);
       doc.text(estimate.client.phone, 120, 120);
@@ -248,7 +246,7 @@ export default function ApprovedWorkDetailsPage() {
     doc.setFont('helvetica', 'normal');
     doc.text('Thank you for your business!', 105, 280, { align: 'center' });
     
-    doc.save(`invoice-phase-${interiorIncomes.indexOf(income) + 1}-${estimate.client?.name || 'client'}.pdf`);
+    doc.save(`invoice-phase-${interiorIncomes.indexOf(income) + 1}-${estimate?.client?.name || 'client'}.pdf`);
   };
 
   const handleMarkAsPaid = async (income: InteriorIncome) => {
@@ -286,8 +284,6 @@ export default function ApprovedWorkDetailsPage() {
         });
 
         if (response.ok) {
-          const updatedIncome = await response.json();
-          
           // Refetch the latest data to ensure we have the most up-to-date information
           await refetchInteriorIncomes();
           
@@ -312,79 +308,6 @@ export default function ApprovedWorkDetailsPage() {
     }
   };
 
-  const createNextPhasePayment = async () => {
-    // Calculate balance amount (total - completed payments)
-    const completedAmount = interiorIncomes
-      .filter(income => income && income.status === 'completed')
-      .reduce((sum, income) => sum + (income?.amount || 0), 0);
-    const balanceAmount = estimate.totalAmount - completedAmount;
-
-    const { value: amount } = await Swal.fire({
-      title: 'Create Next Phase Payment',
-      text: `Enter amount for the next payment phase (Max: ₹${balanceAmount.toLocaleString()}):`,
-      input: 'number',
-      inputPlaceholder: `Enter amount (0 to ₹${balanceAmount.toLocaleString()})`,
-      inputAttributes: {
-        max: balanceAmount,
-        min: 0,
-        step: 1
-      },
-      showCancelButton: true,
-      confirmButtonText: 'Create Payment',
-      cancelButtonText: 'Skip',
-      inputValidator: (value) => {
-        if (!value || value < 0) {
-          return 'Please enter a valid amount';
-        }
-        if (value > balanceAmount) {
-          return `Amount cannot exceed balance of ₹${balanceAmount.toLocaleString()}`;
-        }
-      }
-    });
-
-    if (amount) {
-      try {
-        const response = await fetch('/api/interior-income', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            clientId: estimate.clientId,
-            amount: Number(amount),
-            method: null,
-            status: 'pending',
-            date: new Date().toISOString()
-          }),
-        });
-
-        if (response.ok) {
-          const newIncome = await response.json();
-          
-          // Refetch the latest data to ensure we have the most up-to-date information
-          await refetchInteriorIncomes();
-          
-          Swal.fire({
-            icon: 'success',
-            title: 'Next Phase Created',
-            text: 'New payment phase has been created successfully.',
-            position: 'top-end',
-            toast: true,
-            showConfirmButton: false,
-            timer: 3000
-          });
-        }
-      } catch (error) {
-        console.error('Error creating next phase payment:', error);
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Failed to create next phase payment.',
-        });
-      }
-    }
-  };
-
   const handleEditPayment = async (income: InteriorIncome) => {
     // Only allow editing pending payments
     if (income.status !== 'pending') {
@@ -404,31 +327,33 @@ export default function ApprovedWorkDetailsPage() {
     const otherPendingAmount = interiorIncomes
       .filter(inc => inc && inc.status === 'pending' && inc._id !== income._id)
       .reduce((sum, inc) => sum + (inc?.amount || 0), 0);
-    const maxAmount = estimate.totalAmount - completedAmount - otherPendingAmount;
+    const maxAmount = (estimate?.totalAmount ?? 0) - completedAmount - otherPendingAmount;
 
-    const { value: amount } = await Swal.fire({
+    const swalConfig: SweetAlertOptions = {
       title: 'Edit Payment Amount',
       text: `Enter new amount (Max: ₹${maxAmount.toLocaleString()}):`,
       input: 'number',
       inputValue: income.amount,
       inputPlaceholder: `Enter amount (0 to ₹${maxAmount.toLocaleString()})`,
       inputAttributes: {
-        max: maxAmount,
-        min: 0,
-        step: 1
+        max: String(maxAmount),
+        min: "0",
+        step: "1"
       },
       showCancelButton: true,
       confirmButtonText: 'Update',
       cancelButtonText: 'Cancel',
       inputValidator: (value) => {
-        if (!value || value < 0) {
+        const numValue = Number(value);
+        if (!value || numValue < 0) {
           return 'Please enter a valid amount';
         }
-        if (value > maxAmount) {
+        if (numValue > maxAmount) {
           return `Amount cannot exceed maximum of ₹${maxAmount.toLocaleString()}`;
         }
       }
-    });
+    };
+    const { value: amount } = await Swal.fire(swalConfig);
 
     if (amount && amount !== income.amount) {
       try {
@@ -443,8 +368,6 @@ export default function ApprovedWorkDetailsPage() {
         });
 
         if (response.ok) {
-          const updatedIncome = await response.json();
-          
           // Refetch the latest data to ensure we have the most up-to-date information
           await refetchInteriorIncomes();
           
@@ -513,7 +436,7 @@ export default function ApprovedWorkDetailsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          clientId: estimate.clientId,
+          clientId: estimate?.clientId ?? '',
           stageDesc: 'Work Started',
           date: new Date().toISOString()
         }),
@@ -581,7 +504,7 @@ export default function ApprovedWorkDetailsPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            clientId: estimate.clientId,
+            clientId: estimate?.clientId ?? '',
             stageDesc: stageDesc.trim(),
             date: new Date().toISOString()
           }),
@@ -644,7 +567,7 @@ export default function ApprovedWorkDetailsPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            clientId: estimate.clientId,
+            clientId: estimate?.clientId ?? '',
             stageDesc: 'Completed',
             date: new Date().toISOString()
           }),
@@ -705,7 +628,7 @@ export default function ApprovedWorkDetailsPage() {
     const completedAmount = interiorIncomes
       .filter(income => income && income.status === 'completed')
       .reduce((sum, income) => sum + (income?.amount || 0), 0);
-    const balanceAmount = estimate.totalAmount - completedAmount;
+    const balanceAmount = (estimate?.totalAmount ?? 0) - completedAmount;
 
     const { value: amount } = await Swal.fire({
       title: 'Add Payment Phase',
@@ -713,26 +636,25 @@ export default function ApprovedWorkDetailsPage() {
       input: 'number',
       inputPlaceholder: `Enter amount (0 to ₹${balanceAmount.toLocaleString()})`,
       inputAttributes: {
-        max: balanceAmount,
-        min: 0,
-        step: 1
+        max: String(balanceAmount),
+        min: "0",
+        step: "1"
       },
       showCancelButton: true,
       confirmButtonText: 'Create Phase',
       cancelButtonText: 'Cancel',
       inputValidator: (value) => {
-        if (!value || value < 0) {
+        const numValue = Number(value);
+        if (!value || numValue < 0) {
           return 'Please enter a valid amount';
         }
-        if (value > balanceAmount) {
+        if (numValue > balanceAmount) {
           return `Amount cannot exceed balance of ₹${balanceAmount.toLocaleString()}`;
         }
       }
     });
 
     if (amount) {
-      setPaymentAmount(Number(amount));
-      
       try {
         const response = await fetch('/api/interior-income', {
           method: 'POST',
@@ -740,7 +662,7 @@ export default function ApprovedWorkDetailsPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            clientId: estimate.clientId,
+            clientId: estimate?.clientId ?? '',
             amount: Number(amount),
             method: null,
             status: 'pending',
@@ -749,8 +671,7 @@ export default function ApprovedWorkDetailsPage() {
         });
 
         if (response.ok) {
-          const newIncome = await response.json();
-          console.log('New income created:', newIncome);
+          console.log('New income created successfully');
           
           // Refetch the latest data to ensure we have the most up-to-date information
           await refetchInteriorIncomes();
@@ -855,7 +776,7 @@ export default function ApprovedWorkDetailsPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            clientId: estimate.clientId,
+            clientId: estimate?.clientId ?? '',
             category: formValues.category,
             notes: formValues.notes,
             amount: formValues.amount,
@@ -1365,7 +1286,7 @@ export default function ApprovedWorkDetailsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {stages.filter(stage => stage).map((stage, index) => (
+                {stages.filter(Boolean).map((stage, index) => (
                   <div key={stage._id} className="relative">
                     {/* Timeline Line */}
                     {index < stages.length - 1 && (

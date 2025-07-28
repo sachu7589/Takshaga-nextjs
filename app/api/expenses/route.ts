@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
 import { getCurrentUser, verifyToken, getTokenFromCookies } from '@/app/lib/auth';
 import dbConnect from '@/app/lib/db';
 
@@ -19,7 +18,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await dbConnect();
+    const mongoose = await dbConnect();
+    if (!mongoose.connection.db) {
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    }
+    
     const body = await request.json();
     const { clientId, category, notes, amount, date } = body;
 
@@ -75,7 +78,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await dbConnect();
+    const mongoose = await dbConnect();
+    if (!mongoose.connection.db) {
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    }
+    
     const { searchParams } = new URL(request.url);
     const clientId = searchParams.get('clientId');
 

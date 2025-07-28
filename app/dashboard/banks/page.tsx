@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, CreditCard, User, Building, Hash, Type, Code, Smartphone } from "lucide-react";
+import { Plus, Edit, Trash2, CreditCard, User, Hash, Type, Code, Smartphone } from "lucide-react";
 import Swal from 'sweetalert2';
 
 interface BankDetails {
@@ -16,12 +16,7 @@ interface BankDetails {
   updatedAt: string;
 }
 
-interface UserData {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-}
+
 
 export default function BanksPage() {
   const [banks, setBanks] = useState<BankDetails[]>([]);

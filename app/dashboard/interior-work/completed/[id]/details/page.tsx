@@ -9,11 +9,9 @@ import {
   DollarSign,
   CheckCircle,
   Clock,
-  Plus,
   Download,
   Share2,
   FileText,
-  Play,
   TrendingUp
 } from "lucide-react";
 import Swal from 'sweetalert2';
@@ -30,10 +28,10 @@ interface Item {
   type: 'area' | 'pieces' | 'running' | 'running_sq_feet';
   length?: number;
   breadth?: number;
-  measurements?: any[];
+  measurements?: { length: number; breadth: number }[];
   pieces?: number;
   runningLength?: number;
-  runningMeasurements?: any[];
+  runningMeasurements?: { length: number }[];
   description: string;
   totalAmount: number;
 }
@@ -107,7 +105,7 @@ export default function CompletedWorkDetailsPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [workStarted, setWorkStarted] = useState(false);
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -136,7 +134,7 @@ export default function CompletedWorkDetailsPage() {
         if (stagesResponse.ok) {
           const stagesData = await stagesResponse.json();
           setStages(stagesData.stages || []);
-          setWorkStarted(stagesData.stages?.some((stage: Stage) => stage && stage.stageDesc === 'Work Started') || false);
+  
         }
 
         // Fetch interior incomes
@@ -165,35 +163,6 @@ export default function CompletedWorkDetailsPage() {
       fetchData();
     }
   }, [estimateId]);
-
-  const refetchStages = async () => {
-    if (!estimate?.clientId) return;
-    
-    try {
-      const response = await fetch(`/api/stages?clientId=${estimate.clientId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setStages(data.stages || []);
-        setWorkStarted(data.stages?.some((stage: Stage) => stage && stage.stageDesc === 'Work Started') || false);
-      }
-    } catch (error) {
-      console.error('Error refetching stages:', error);
-    }
-  };
-
-  const refetchInteriorIncomes = async () => {
-    if (!estimate?.clientId) return;
-    
-    try {
-      const response = await fetch(`/api/interior-income?clientId=${estimate.clientId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setInteriorIncomes(data.interiorIncomes || []);
-      }
-    } catch (error) {
-      console.error('Error refetching interior incomes:', error);
-    }
-  };
 
   const handleBackToCompletedWorks = () => {
     router.push('/dashboard/interior-work/completed');
@@ -350,8 +319,8 @@ export default function CompletedWorkDetailsPage() {
             } else if (item.type === 'running' && item.runningLength) {
               details = `${item.runningLength}' running`;
             } else if (item.type === 'running_sq_feet' && runningMeasurements.length > 0) {
-              const totalSqFt = runningMeasurements.reduce((sum, m) => sum + (m.length * m.breadth), 0);
-              details = `${totalSqFt.toFixed(2)} sq.ft running`;
+              const totalRunningLength = runningMeasurements.reduce((sum, m) => sum + m.length, 0);
+              details = `${totalRunningLength.toFixed(2)} ft running`;
             } else if (measurements.length > 0) {
               const totalSqFt = measurements.reduce((sum, m) => sum + (m.length * m.breadth), 0);
               details = `${totalSqFt.toFixed(2)} sq.ft`;
@@ -388,7 +357,7 @@ export default function CompletedWorkDetailsPage() {
             margin: { left: 10, right: 10 }
           });
 
-          yPos = (doc as any).lastAutoTable.finalY + 10;
+          yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
         });
 
         yPos += categorySpacing;
@@ -528,10 +497,7 @@ export default function CompletedWorkDetailsPage() {
 
   // Calculate financial summary
   const completedPayments = interiorIncomes.filter(income => income && income.status === 'completed');
-  const pendingPayments = interiorIncomes.filter(income => income && income.status === 'pending');
   const totalReceived = completedPayments.reduce((sum, income) => sum + (income?.amount || 0), 0);
-  const totalPending = pendingPayments.reduce((sum, income) => sum + (income?.amount || 0), 0);
-  const balanceAmount = estimate.totalAmount - totalReceived;
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -1008,15 +974,17 @@ export default function CompletedWorkDetailsPage() {
                   <div key={category} className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-6 border border-gray-100 shadow-sm">
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center space-x-3">
-                        <div className={`p-2 bg-gradient-to-r ${categoryConfig.color} rounded-lg`}>
-                          <span className="text-white text-lg">{categoryConfig.icon}</span>
-                        </div>
+                        {categoryConfig && (
+                          <div className={`p-2 bg-gradient-to-r ${categoryConfig.color} rounded-lg`}>
+                            <span className="text-white text-lg">{categoryConfig.icon}</span>
+                          </div>
+                        )}
                         <div>
                           <h4 className="text-lg font-semibold text-gray-900 capitalize">{category} Expenses</h4>
                           <p className="text-sm text-gray-600">{categoryExpenses.length} expense{categoryExpenses.length !== 1 ? 's' : ''}</p>
                         </div>
                       </div>
-                      <div className={`px-4 py-2 rounded-full text-sm font-semibold border ${categoryConfig.bgColor} ${categoryConfig.borderColor} ${categoryConfig.textColor}`}>
+                      <div className={`px-4 py-2 rounded-full text-sm font-semibold border ${categoryConfig?.bgColor} ${categoryConfig?.borderColor} ${categoryConfig?.textColor}`}>
                         ₹{categoryTotal.toLocaleString()}
                       </div>
                     </div>

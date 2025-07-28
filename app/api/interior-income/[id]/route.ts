@@ -2,14 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import dbConnect from "@/app/lib/db";
 import { getCurrentUser, verifyToken } from "@/app/lib/auth";
-import mongoose from "mongoose";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await dbConnect();
+    const mongoose = await dbConnect();
+    if (!mongoose.connection.db) {
+      return NextResponse.json(
+        { success: false, message: "Database connection failed" },
+        { status: 500 }
+      );
+    }
     
     // Get current user from token (check both Authorization header and cookies)
     let currentUser = getCurrentUser(request);
@@ -44,7 +49,13 @@ export async function PATCH(
     }
 
     // Build update object
-    const updateData: any = {
+    const updateData: {
+      updatedAt: Date;
+      status?: string;
+      method?: string | null;
+      markedBy?: string;
+      amount?: number;
+    } = {
       updatedAt: new Date()
     };
 

@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { connectDB } from "@/app/lib/db";
+import { NextResponse } from "next/server";
+import dbConnect from "@/app/lib/db";
 import User from "@/app/models/User";
 
 // GET all users
 export async function GET() {
   try {
-    await connectDB();
+    await dbConnect();
     
     const users = await User.find({}).select('-password');
     

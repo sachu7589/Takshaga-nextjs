@@ -29,10 +29,10 @@ interface Item {
   type: 'area' | 'pieces' | 'running' | 'running_sq_feet';
   length?: number;
   breadth?: number;
-  measurements?: any[];
+  measurements?: { length: number; breadth: number }[];
   pieces?: number;
   runningLength?: number;
-  runningMeasurements?: any[];
+  runningMeasurements?: { length: number }[];
   description: string;
   totalAmount: number;
 }
@@ -274,8 +274,8 @@ export default function CompletedWorksPage() {
             } else if (item.type === 'running' && item.runningLength) {
               details = `${item.runningLength}' running`;
             } else if (item.type === 'running_sq_feet' && runningMeasurements.length > 0) {
-              const totalSqFt = runningMeasurements.reduce((sum, m) => sum + (m.length * m.breadth), 0);
-              details = `${totalSqFt.toFixed(2)} sq.ft running`;
+              const totalRunningLength = runningMeasurements.reduce((sum, m) => sum + m.length, 0);
+              details = `${totalRunningLength.toFixed(2)} ft running`;
             } else if (measurements.length > 0) {
               const totalSqFt = measurements.reduce((sum, m) => sum + (m.length * m.breadth), 0);
               details = `${totalSqFt.toFixed(2)} sq.ft`;
@@ -312,7 +312,7 @@ export default function CompletedWorksPage() {
             margin: { left: 10, right: 10 }
           });
 
-          yPos = (doc as any).lastAutoTable.finalY + 10;
+          yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
         });
 
         yPos += categorySpacing;

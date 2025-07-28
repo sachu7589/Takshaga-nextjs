@@ -5,11 +5,12 @@ import Bank from "@/app/models/Bank";
 // PUT update bank
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
     
+    const { id } = await params;
     const body = await request.json();
     const { bankName, accountName, accountNumber, accountType, ifscCode, upiId } = body;
     
@@ -23,7 +24,7 @@ export async function PUT(
     
     // Find and update bank
     const bank = await Bank.findByIdAndUpdate(
-      params.id,
+      id,
       {
         bankName,
         accountName,
@@ -69,12 +70,13 @@ export async function PUT(
 // DELETE bank
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
     
-    const bank = await Bank.findByIdAndDelete(params.id);
+    const { id } = await params;
+    const bank = await Bank.findByIdAndDelete(id);
     
     if (!bank) {
       return NextResponse.json(
