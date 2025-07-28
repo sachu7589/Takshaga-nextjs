@@ -80,6 +80,20 @@ interface ClientDetails {
   createdAt: string;
 }
 
+interface Estimate {
+  _id: string;
+  userId: string;
+  clientId: string;
+  estimateName: string;
+  items: Item[];
+  totalAmount: number;
+  discount?: number;
+  discountType?: 'percentage' | 'fixed';
+  status?: 'pending' | 'approved';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function InteriorEstimatePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -89,6 +103,8 @@ export default function InteriorEstimatePage() {
   
   const [clientDetails, setClientDetails] = useState<ClientDetails | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hasApprovedEstimate, setHasApprovedEstimate] = useState(false);
+  const [approvedEstimate, setApprovedEstimate] = useState<Estimate | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [showCustomItemModal, setShowCustomItemModal] = useState(false);
@@ -133,19 +149,32 @@ export default function InteriorEstimatePage() {
 
 
 
-  // Fetch client details
+  // Fetch client details and check for approved estimates
   useEffect(() => {
     const fetchClientDetails = async () => {
       if (!clientId) return;
       
       setLoading(true);
       try {
+        // Fetch client details
         const response = await fetch(`/api/clients/${clientId}`);
         if (response.ok) {
           const data = await response.json();
           setClientDetails(data.client);
         } else {
           console.error('Failed to fetch client details');
+        }
+
+        // Check for approved estimates
+        const estimatesResponse = await fetch(`/api/interior-estimates/client/${clientId}`);
+        if (estimatesResponse.ok) {
+          const estimatesData = await estimatesResponse.json();
+          const approvedEst = estimatesData.estimates?.find((est: Estimate) => est.status === 'approved');
+          
+          if (approvedEst) {
+            setHasApprovedEstimate(true);
+            setApprovedEstimate(approvedEst);
+          }
         }
       } catch (error) {
         console.error('Error fetching client details:', error);
@@ -884,6 +913,40 @@ export default function InteriorEstimatePage() {
         </div>
       )}
 
+      {/* Approved Estimate Warning */}
+      {hasApprovedEstimate && approvedEstimate && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                <svg className="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-red-800">Estimate Already Approved</h3>
+                <p className="text-red-700">
+                  An interior estimate has already been approved for this client: <strong>{approvedEstimate.estimateName}</strong>
+                </p>
+                <p className="text-sm text-red-600 mt-1">
+                  You cannot create new interior estimates for this client. Please view the approved estimate instead.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push(`/dashboard/estimates/interior/${approvedEstimate._id}`)}
+              className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors cursor-pointer text-sm"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span>View Approved Estimate</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Preset Info */}
       {presetName && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-6">
@@ -913,7 +976,8 @@ export default function InteriorEstimatePage() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {!hasApprovedEstimate && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Total Items</h3>
           <p className="text-3xl font-bold text-blue-600">{items.length}</p>
@@ -976,9 +1040,13 @@ export default function InteriorEstimatePage() {
           <p className="text-sm text-gray-600">{clientName}</p>
         </div>
       </div>
+      )}
 
       {/* Category Selection */}
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+
+      {/* Category Selection */}
+      {!hasApprovedEstimate && (
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Select Items</h2>
         
         {dataLoading ? (
@@ -1051,11 +1119,12 @@ export default function InteriorEstimatePage() {
           </>
         )}
       </div>
+      )}
 
 
 
       {/* Items List */}
-      {items.length > 0 && (
+      {!hasApprovedEstimate && items.length > 0 && (
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Estimate Items</h2>
@@ -1588,7 +1657,8 @@ export default function InteriorEstimatePage() {
       )}
 
       {/* Save Estimate Button */}
-      <div className="flex gap-4">
+      {!hasApprovedEstimate && (
+        <div className="flex gap-4">
         <button
           onClick={handleBackToEstimates}
           className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer text-sm w-40"
@@ -1603,6 +1673,7 @@ export default function InteriorEstimatePage() {
           Save Estimate
         </button>
       </div>
+      )}
 
       {/* Add Custom Item Modal */}
       {showCustomItemModal && (

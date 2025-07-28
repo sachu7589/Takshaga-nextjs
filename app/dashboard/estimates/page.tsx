@@ -44,6 +44,7 @@ interface Estimate {
   totalAmount: number;
   discount?: number;
   discountType?: 'percentage' | 'fixed';
+  status?: 'pending' | 'approved';
   createdAt: string;
   updatedAt: string;
   user?: User;
@@ -259,9 +260,18 @@ export default function EstimatesPage() {
               </div>
               
               <div className="mb-4">
-                <h4 className="font-semibold text-gray-900 text-lg mb-2">
-                  {estimate.estimateName}
-                </h4>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold text-gray-900 text-lg">
+                    {estimate.estimateName}
+                  </h4>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    estimate.status === 'approved' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {estimate.status === 'approved' ? 'Approved' : 'Pending'}
+                  </span>
+                </div>
                 <p className="text-sm text-gray-600 mb-3">
                   {estimate.items.length} items • Interior Estimate
                 </p>

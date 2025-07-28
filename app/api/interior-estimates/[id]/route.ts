@@ -128,6 +128,90 @@ export async function PUT(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Await params in Next.js 15
+    const { id } = await params;
+    
+    // Get current user from token (check both Authorization header and cookies)
+    let currentUser = getCurrentUser(request);
+    
+    if (!currentUser) {
+      // Try to get token from cookies
+      const cookieStore = await cookies();
+      const tokenFromCookie = cookieStore.get('token')?.value;
+      
+      if (tokenFromCookie) {
+        const { verifyToken } = await import('@/app/lib/auth');
+        currentUser = verifyToken(tokenFromCookie);
+      }
+    }
+    
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please login' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { status } = body;
+
+    if (!status) {
+      return NextResponse.json(
+        { error: 'Status is required' },
+        { status: 400 }
+      );
+    }
+
+    const mongoose = await dbConnect();
+    if (!mongoose.connection.db) {
+      return NextResponse.json(
+        { error: 'Database connection failed' },
+        { status: 500 }
+      );
+    }
+
+    const result = await mongoose.connection.db.collection('interior_estimates').updateOne(
+      { _id: new mongoose.Types.ObjectId(id) },
+      {
+        $set: {
+          status,
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json(
+        { error: 'Estimate not found' },
+        { status: 404 }
+      );
+    }
+
+    // Fetch the updated estimate
+    const updatedEstimate = await mongoose.connection.db.collection('interior_estimates').findOne({
+      _id: new mongoose.Types.ObjectId(id)
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Estimate status updated successfully',
+      estimate: updatedEstimate
+    });
+
+  } catch (error) {
+    console.error('Error updating estimate status:', error);
+    return NextResponse.json(
+      { error: 'Failed to update estimate status' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

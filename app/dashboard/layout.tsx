@@ -12,7 +12,11 @@ import {
   Settings,
   Bell,
   Palette,
-  MessageSquare
+  MessageSquare,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle,
+  CreditCard
 } from "lucide-react";
 import Image from "next/image";
 
@@ -31,6 +35,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -91,6 +96,25 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       active: pathname === "/dashboard/clients" || pathname.startsWith("/dashboard/estimates")
     },
     {
+      name: "Interior Work",
+      icon: CheckCircle,
+      href: "#",
+      active: pathname.startsWith("/dashboard/interior-work"),
+      hasSubMenu: true,
+      subMenus: [
+        {
+          name: "Approved Works",
+          href: "/dashboard/interior-work/approved",
+          active: pathname === "/dashboard/interior-work/approved"
+        },
+        {
+          name: "Completed Works",
+          href: "/dashboard/interior-work/completed",
+          active: pathname === "/dashboard/interior-work/completed"
+        }
+      ]
+    },
+    {
       name: "Enquiries",
       icon: MessageSquare,
       href: "/dashboard/enquiries",
@@ -107,6 +131,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       icon: Palette,
       href: "/dashboard/interior-presets",
       active: pathname === "/dashboard/interior-presets" || pathname.startsWith("/dashboard/interior-presets")
+    },
+    {
+      name: "Banks",
+      icon: CreditCard,
+      href: "/dashboard/banks",
+      active: pathname === "/dashboard/banks" || pathname.startsWith("/dashboard/banks")
     }
   ];
 
@@ -142,6 +172,57 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           {menuItems.map((item) => {
             const Icon = item.icon;
+            const isExpanded = expandedMenus.includes(item.name);
+            
+            if (item.hasSubMenu) {
+              return (
+                <div key={item.name}>
+                  <button
+                    onClick={() => {
+                      setExpandedMenus(prev => 
+                        prev.includes(item.name) 
+                          ? prev.filter(name => name !== item.name)
+                          : [...prev, item.name]
+                      );
+                    }}
+                    className={`flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                      item.active
+                        ? 'bg-blue-600 text-white shadow-lg'
+                        : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Icon className="h-5 w-5" />
+                      <span>{item.name}</span>
+                    </div>
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                  </button>
+                  
+                  {isExpanded && (
+                    <div className="ml-8 mt-2 space-y-1">
+                      {item.subMenus?.map((subItem) => (
+                        <a
+                          key={subItem.name}
+                          href={subItem.href}
+                          className={`flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                            subItem.active
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                          }`}
+                        >
+                          <span>{subItem.name}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            
             return (
               <a
                 key={item.name}

@@ -11,7 +11,8 @@ import {
   Plus,
   X,
   Download,
-  Share2
+  Share2,
+  CheckCircle
 } from "lucide-react";
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
@@ -79,6 +80,7 @@ interface Estimate {
   totalAmount: number;
   discount?: number;
   discountType?: 'percentage' | 'fixed';
+  status?: 'pending' | 'approved';
   createdAt: string;
   updatedAt: string;
 }
@@ -228,7 +230,14 @@ export default function InteriorEstimateDetailsPage() {
   }, []);
 
   const handleBackToEstimates = () => {
-    router.push('/dashboard/estimates');
+    if (estimate?.clientId && clientDetails) {
+      const params = new URLSearchParams();
+      params.set('clientId', estimate.clientId);
+      params.set('clientName', clientDetails.name);
+      router.push(`/dashboard/estimates?${params.toString()}`);
+    } else {
+      router.push('/dashboard/estimates');
+    }
   };
 
   const handleEditEstimate = () => {
@@ -947,6 +956,77 @@ export default function InteriorEstimateDetailsPage() {
     setShowShareModal(true);
   };
 
+  const handleApproveEstimate = async () => {
+    if (!estimate) return;
+
+    // Show confirmation dialog
+    const result = await Swal.fire({
+      title: 'Approve Estimate?',
+      text: `Are you sure you want to approve "${estimate.estimateName}"? This will delete all other estimates for this client.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#10b981',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, Approve!',
+      cancelButtonText: 'Cancel'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const response = await fetch(`/api/interior-estimates/${estimateId}/approve`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to approve estimate');
+        }
+
+        // Update local state
+        setEstimate(prev => prev ? { ...prev, status: 'approved' } : null);
+
+        // Show success message
+        Swal.fire({
+          icon: 'success',
+          title: 'Estimate Approved!',
+          text: `Estimate "${estimate.estimateName}" has been approved successfully. ${data.deletedEstimatesCount} other estimates for this client have been deleted.`,
+          position: 'top-end',
+          toast: true,
+          showConfirmButton: false,
+          timer: 5000
+        });
+
+        // Redirect to estimates page after a short delay
+        setTimeout(() => {
+          if (estimate?.clientId && clientDetails) {
+            const params = new URLSearchParams();
+            params.set('clientId', estimate.clientId);
+            params.set('clientName', clientDetails.name);
+            router.push(`/dashboard/estimates?${params.toString()}`);
+          } else {
+            router.push('/dashboard/estimates');
+          }
+        }, 2000);
+
+      } catch (error) {
+        console.error('Error approving estimate:', error);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: error instanceof Error ? error.message : 'Failed to approve estimate',
+          position: 'top-end',
+          toast: true,
+          showConfirmButton: false,
+          timer: 3000
+        });
+      }
+    }
+  };
+
   const handleWhatsAppShare = () => {
     if (!estimate || !clientDetails) return;
 
@@ -1350,6 +1430,15 @@ We look forward to bringing your vision to life!
           <div className="flex space-x-3">
             {!isEditMode && (
               <>
+                {estimate.status !== 'approved' && (
+                  <button
+                    onClick={handleApproveEstimate}
+                    className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer text-sm"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Approve</span>
+                  </button>
+                )}
                 <button
                   onClick={handleDownloadEstimate}
                   className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors cursor-pointer text-sm"
@@ -1411,8 +1500,16 @@ We look forward to bringing your vision to life!
                   <p className="text-blue-900">{new Date(estimate.createdAt).toLocaleDateString()}</p>
                 </div>
                 <div>
-                  <span className="font-medium text-blue-700">Items:</span>
-                  <p className="text-blue-900">{estimate.items.length}</p>
+                  <span className="font-medium text-blue-700">Status:</span>
+                  <div className="flex items-center mt-1">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      estimate.status === 'approved' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {estimate.status === 'approved' ? 'Approved' : 'Pending'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1444,7 +1541,7 @@ We look forward to bringing your vision to life!
               <div className="flex justify-between items-center mb-2">
                 <span className="text-purple-700 font-medium">Subtotal:</span>
                 <span className="text-purple-900 font-semibold">
-                  ₹{isEditMode ? calculateSubtotal().toFixed(1) : (estimate.discount && estimate.discount > 0 ? (estimate.discountType === 'percentage' ? (estimate.totalAmount / (1 - estimate.discount / 100)) : (estimate.totalAmount + estimate.discount)) : estimate.totalAmount).toFixed(1)}
+                  ₹{isEditMode ? calculateSubtotal().toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : (estimate.discount && estimate.discount > 0 ? (estimate.discountType === 'percentage' ? (estimate.totalAmount / (1 - estimate.discount / 100)) : (estimate.totalAmount + estimate.discount)) : estimate.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                 </span>
               </div>
 
@@ -1479,7 +1576,7 @@ We look forward to bringing your vision to life!
                     />
                   </div>
                   <span className="text-purple-900 font-semibold">
-                    -₹{calculateDiscountAmount().toFixed(1)}
+                    -₹{calculateDiscountAmount().toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                   </span>
                 </div>
               )}
@@ -1491,7 +1588,7 @@ We look forward to bringing your vision to life!
                     Discount ({estimate.discountType === 'percentage' ? `${estimate.discount}%` : `₹${estimate.discount}`}):
                   </span>
                   <span className="text-purple-900 font-semibold">
-                    -₹{estimate.discountType === 'percentage' ? ((estimate.totalAmount * estimate.discount) / 100).toFixed(1) : estimate.discount.toFixed(1)}
+                    -₹{estimate.discountType === 'percentage' ? ((estimate.totalAmount * estimate.discount) / 100).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : estimate.discount.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                   </span>
                 </div>
               )}
@@ -1501,7 +1598,7 @@ We look forward to bringing your vision to life!
                 <div className="flex justify-between items-center">
                   <span className="text-purple-900 font-bold text-lg">Grand Total:</span>
                   <span className="text-purple-600 font-bold text-2xl">
-                    ₹{isEditMode ? calculateFinalTotal().toFixed(1) : estimate.totalAmount.toFixed(1)}
+                    ₹{isEditMode ? calculateFinalTotal().toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : estimate.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                   </span>
                 </div>
               </div>
