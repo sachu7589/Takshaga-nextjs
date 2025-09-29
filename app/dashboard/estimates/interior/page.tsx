@@ -45,6 +45,7 @@ interface Item {
   runningMeasurements?: RunningMeasurement[];
   description: string;
   totalAmount: number;
+  amountPerSqFt?: number; // Store the amount per sq ft separately
 }
 
 interface Category {
@@ -264,6 +265,7 @@ export default function InteriorEstimatePage() {
         type: section.type,
         description: section.description || "",
         totalAmount: 0, // Will be calculated when user inputs dimensions
+        amountPerSqFt: section.amount, // Store the amount per sq ft from the database
         ...(section.type === 'area' && {
           length: 0,
           breadth: 0
@@ -305,8 +307,9 @@ export default function InteriorEstimatePage() {
   const handleSaveEdit = (itemId: string) => {
     if (!editingItemData) return;
 
-    // Recalculate total amount based on the type
-    const amountPerSqFt = editingItemData.totalAmount;
+    // Use the amountPerSqFt field if available, otherwise fall back to totalAmount
+    const amountPerSqFt = editingItemData.amountPerSqFt || editingItemData.totalAmount;
+
     const calculatedTotal = calculateTotalAmount(
       editingItemData.type,
       editingItemData.length || 0,
@@ -314,7 +317,8 @@ export default function InteriorEstimatePage() {
       editingItemData.pieces || 0,
       editingItemData.runningLength || 0,
       amountPerSqFt,
-      editingItemData.measurements
+      editingItemData.measurements,
+      editingItemData.runningMeasurements
     );
 
     const updatedItem: Item = {
@@ -514,7 +518,9 @@ export default function InteriorEstimatePage() {
     setItems(prev => prev.map(item => {
       if (item.id === itemId) {
         const updatedItem = { ...item, ...newData };
-        const amountPerSqFt = updatedItem.totalAmount;
+        // Use the amountPerSqFt field if available, otherwise fall back to totalAmount
+        const amountPerSqFt = updatedItem.amountPerSqFt || updatedItem.totalAmount;
+        
         const calculatedTotal = calculateTotalAmount(
           updatedItem.type,
           updatedItem.length || 0,
@@ -608,6 +614,7 @@ export default function InteriorEstimatePage() {
       type: customItem.type,
       description: customItem.description,
       totalAmount: calculatedTotal,
+      amountPerSqFt: amountPerSqFt,
       ...(customItem.type === 'area' && {
         length: parseFloat(customItem.length) || 0,
         breadth: parseFloat(customItem.breadth) || 0,
@@ -1543,28 +1550,17 @@ export default function InteriorEstimatePage() {
                                   {editingItem?.id === item.id ? (
                                     <input
                                       type="number"
-                                      value={editingItemData?.totalAmount || item.totalAmount}
+                                      value={editingItemData?.amountPerSqFt || item.amountPerSqFt || 0}
                                       onChange={(e) => {
                                         const newAmount = parseFloat(e.target.value) || 0;
-                                        setEditingItemData(prev => prev ? { ...prev, totalAmount: newAmount } : null);
-                                        updateItemTotal(item.id, { totalAmount: newAmount });
+                                        setEditingItemData(prev => prev ? { ...prev, amountPerSqFt: newAmount } : null);
+                                        updateItemTotal(item.id, { amountPerSqFt: newAmount });
                                       }}
                                       className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                                     />
                                   ) : (
                                     <div className="text-center">
-                                      ₹{(() => {
-                                        let amount = 0;
-                                        if (item.type === 'area') {
-                                          const sqFeet = cmToSqFeet(item.length || 0, item.breadth || 0);
-                                          amount = sqFeet > 0 ? (item.totalAmount / sqFeet) : 0;
-                                        } else if (item.type === 'pieces') {
-                                          amount = (item.pieces || 0) > 0 ? (item.totalAmount / (item.pieces || 1)) : 0;
-                                        } else {
-                                          amount = item.totalAmount;
-                                        }
-                                        return isFinite(amount) ? amount.toFixed(2) : '0.00';
-                                      })().toLocaleString()}
+                                      ₹{(item.amountPerSqFt || 0).toFixed(2).toLocaleString()}
                                     </div>
                                   )}
                                 </td>
