@@ -374,7 +374,8 @@ export default function InteriorEstimatePage() {
     };
 
     const updatedMeasurements = [...(item.measurements || []), measurement];
-    updateItemTotal(item.id, { measurements: updatedMeasurements });
+    // Preserve the amountPerSqFt when updating
+    updateItemTotal(item.id, { measurements: updatedMeasurements, amountPerSqFt: item.amountPerSqFt });
     setEditingItemData(prev => prev ? { ...prev, measurements: updatedMeasurements } : null);
   };
 
@@ -385,7 +386,8 @@ export default function InteriorEstimatePage() {
     };
 
     const updatedRunningMeasurements = [...(item.runningMeasurements || []), runningMeasurement];
-    updateItemTotal(item.id, { runningMeasurements: updatedRunningMeasurements });
+    // Preserve the amountPerSqFt when updating
+    updateItemTotal(item.id, { runningMeasurements: updatedRunningMeasurements, amountPerSqFt: item.amountPerSqFt });
     setEditingItemData(prev => prev ? { ...prev, runningMeasurements: updatedRunningMeasurements } : null);
   };
 
@@ -476,12 +478,13 @@ export default function InteriorEstimatePage() {
       case 'area':
         if (amountPerSqFt) {
           let totalSqFeet = 0;
+          // Add the first row length/breadth if they exist
+          if (length && breadth) {
+            totalSqFeet += cmToSqFeet(length, breadth);
+          }
+          // Add all additional measurements
           if (measurements && measurements.length > 0) {
-            // Use multiple measurements if available
-            totalSqFeet = calculateTotalSqFeet(measurements);
-          } else if (length && breadth) {
-            // Fallback to single length/breadth
-            totalSqFeet = cmToSqFeet(length, breadth);
+            totalSqFeet += calculateTotalSqFeet(measurements);
           }
           const result = totalSqFeet * amountPerSqFt;
           return isFinite(result) ? result : 0;
@@ -497,12 +500,13 @@ export default function InteriorEstimatePage() {
       case 'running_sq_feet':
         if (amountPerSqFt) {
           let totalFeet = 0;
+          // Add the first row running length if it exists
+          if (runningLength) {
+            totalFeet += cmToFeet(runningLength);
+          }
+          // Add all additional running measurements
           if (runningMeasurements && runningMeasurements.length > 0) {
-            // Use multiple running measurements if available
-            totalFeet = calculateTotalRunningFeet(runningMeasurements);
-          } else if (runningLength) {
-            // Fallback to single running length
-            totalFeet = cmToFeet(runningLength);
+            totalFeet += calculateTotalRunningFeet(runningMeasurements);
           }
           const result = totalFeet * amountPerSqFt;
           return isFinite(result) ? result : 0;
@@ -518,8 +522,9 @@ export default function InteriorEstimatePage() {
     setItems(prev => prev.map(item => {
       if (item.id === itemId) {
         const updatedItem = { ...item, ...newData };
-        // Use the amountPerSqFt field if available, otherwise fall back to totalAmount
-        const amountPerSqFt = updatedItem.amountPerSqFt || updatedItem.totalAmount;
+        // Use the amountPerSqFt field - it should always be set from the database or custom item creation
+        // Fall back to item.amountPerSqFt if not provided in newData
+        const amountPerSqFt = updatedItem.amountPerSqFt || item.amountPerSqFt || 0;
         
         const calculatedTotal = calculateTotalAmount(
           updatedItem.type,
@@ -1234,7 +1239,7 @@ export default function InteriorEstimatePage() {
                                               onChange={(e) => {
                                                 const newLength = parseFloat(e.target.value) || 0;
                                                 setEditingItemData(prev => prev ? { ...prev, length: newLength } : null);
-                                                updateItemTotal(item.id, { length: newLength });
+                                                updateItemTotal(item.id, { length: newLength, amountPerSqFt: item.amountPerSqFt });
                                               }}
                                               className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
                                               placeholder="Length"
@@ -1253,7 +1258,7 @@ export default function InteriorEstimatePage() {
                                                         m.id === measurement.id ? { ...m, length: parseFloat(e.target.value) || 0 } : m
                                                       ) || [];
                                                       setEditingItemData(prev => prev ? { ...prev, measurements: newMeasurements } : null);
-                                                      updateItemTotal(item.id, { measurements: newMeasurements });
+                                                      updateItemTotal(item.id, { measurements: newMeasurements, amountPerSqFt: item.amountPerSqFt });
                                                     }}
                                                     className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
                                                     placeholder="Length"
@@ -1295,7 +1300,7 @@ export default function InteriorEstimatePage() {
                                                     onClick={() => {
                                                       const newMeasurements = editingItemData.measurements?.filter(m => m.id !== measurement.id) || [];
                                                       setEditingItemData(prev => prev ? { ...prev, measurements: newMeasurements } : null);
-                                                      updateItemTotal(item.id, { measurements: newMeasurements });
+                                                      updateItemTotal(item.id, { measurements: newMeasurements, amountPerSqFt: item.amountPerSqFt });
                                                     }}
                                                     className="w-6 h-6 bg-red-500 text-white rounded flex items-center justify-center hover:bg-red-600 transition-colors"
                                                     title="Remove Measurement"
@@ -1331,7 +1336,7 @@ export default function InteriorEstimatePage() {
                                             onChange={(e) => {
                                               const newBreadth = parseFloat(e.target.value) || 0;
                                               setEditingItemData(prev => prev ? { ...prev, breadth: newBreadth } : null);
-                                              updateItemTotal(item.id, { breadth: newBreadth });
+                                              updateItemTotal(item.id, { breadth: newBreadth, amountPerSqFt: item.amountPerSqFt });
                                             }}
                                             className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
                                             placeholder="Breadth"
@@ -1349,7 +1354,7 @@ export default function InteriorEstimatePage() {
                                                         m.id === measurement.id ? { ...m, breadth: parseFloat(e.target.value) || 0 } : m
                                                       ) || [];
                                                       setEditingItemData(prev => prev ? { ...prev, measurements: newMeasurements } : null);
-                                                      updateItemTotal(item.id, { measurements: newMeasurements });
+                                                      updateItemTotal(item.id, { measurements: newMeasurements, amountPerSqFt: item.amountPerSqFt });
                                                     }}
                                                     className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
                                                     placeholder="Breadth"
@@ -1412,7 +1417,7 @@ export default function InteriorEstimatePage() {
                                           onChange={(e) => {
                                             const newPieces = parseInt(e.target.value) || 0;
                                             setEditingItemData(prev => prev ? { ...prev, pieces: newPieces } : null);
-                                            updateItemTotal(item.id, { pieces: newPieces });
+                                            updateItemTotal(item.id, { pieces: newPieces, amountPerSqFt: item.amountPerSqFt });
                                           }}
                                           className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
                                         />
@@ -1435,7 +1440,7 @@ export default function InteriorEstimatePage() {
                                               onChange={(e) => {
                                                 const newRunningLength = parseFloat(e.target.value) || 0;
                                                 setEditingItemData(prev => prev ? { ...prev, runningLength: newRunningLength } : null);
-                                                updateItemTotal(item.id, { runningLength: newRunningLength });
+                                                updateItemTotal(item.id, { runningLength: newRunningLength, amountPerSqFt: item.amountPerSqFt });
                                               }}
                                               className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
                                               placeholder="Length"
@@ -1454,7 +1459,7 @@ export default function InteriorEstimatePage() {
                                                         m.id === measurement.id ? { ...m, length: parseFloat(e.target.value) || 0 } : m
                                                       ) || [];
                                                       setEditingItemData(prev => prev ? { ...prev, runningMeasurements: newRunningMeasurements } : null);
-                                                      updateItemTotal(item.id, { runningMeasurements: newRunningMeasurements });
+                                                      updateItemTotal(item.id, { runningMeasurements: newRunningMeasurements, amountPerSqFt: item.amountPerSqFt });
                                                     }}
                                                     className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
                                                     placeholder="Length"
@@ -1496,7 +1501,7 @@ export default function InteriorEstimatePage() {
                                                     onClick={() => {
                                                       const newRunningMeasurements = editingItemData.runningMeasurements?.filter(m => m.id !== measurement.id) || [];
                                                       setEditingItemData(prev => prev ? { ...prev, runningMeasurements: newRunningMeasurements } : null);
-                                                      updateItemTotal(item.id, { runningMeasurements: newRunningMeasurements });
+                                                      updateItemTotal(item.id, { runningMeasurements: newRunningMeasurements, amountPerSqFt: item.amountPerSqFt });
                                                     }}
                                                     className="w-6 h-6 bg-red-500 text-white rounded flex items-center justify-center hover:bg-red-600 transition-colors"
                                                     title="Remove Measurement"
