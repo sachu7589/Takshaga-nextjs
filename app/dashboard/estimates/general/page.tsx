@@ -3,22 +3,24 @@
 import { useState } from "react";
 import { 
   ArrowLeft,
-  FileText,
-  Building,
-  Star,
-  Save
+  Plus,
+  Trash2,
+  Edit,
+  Save,
+  Download,
+  X
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Swal from 'sweetalert2';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
-interface GeneralEstimateForm {
-  estimateType: string;
-  projectScope: string;
-  area: string;
-  complexity: string;
-  timeline: string;
-  budget: string;
-  description: string;
+interface EstimateItem {
+  id: string;
+  particulars: string;
+  amountPerSqFt: number;
+  sqFeet: number;
+  totalAmount: number;
 }
 
 export default function GeneralEstimatePage() {
@@ -28,120 +30,257 @@ export default function GeneralEstimatePage() {
   const clientName = searchParams.get('clientName');
   const estimateType = searchParams.get('type');
 
-  const [estimateForm, setEstimateForm] = useState<GeneralEstimateForm>({
-    estimateType: estimateType || "",
-    projectScope: "",
-    area: "",
-    complexity: "",
-    timeline: "",
-    budget: "",
-    description: ""
-  });
+  const [estimateName, setEstimateName] = useState('');
+  const [items, setItems] = useState<EstimateItem[]>([]);
+  const [editingItem, setEditingItem] = useState<EstimateItem | null>(null);
+  const [editingItemData, setEditingItemData] = useState<EstimateItem | null>(null);
+  const [discount, setDiscount] = useState<number>(0);
+  const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
 
   const getEstimateTypeInfo = () => {
     switch (estimateType) {
+      case 'other':
+        return {
+          title: 'General Estimate',
+          shortTitle: 'General'
+        };
       case 'permit':
         return {
           title: 'Permit Estimate',
-          icon: <FileText className="h-6 w-6" />,
-          color: 'text-blue-600',
-          bgColor: 'bg-blue-50',
-          description: 'Building permits and regulatory compliance services'
+          shortTitle: 'Permit'
         };
       case 'building':
         return {
           title: 'Building Estimation',
-          icon: <Building className="h-6 w-6" />,
-          color: 'text-green-600',
-          bgColor: 'bg-green-50',
-          description: 'Complete building construction and structural services'
+          shortTitle: 'Building'
         };
       case '3d':
         return {
           title: '3D Estimate',
-          icon: <Star className="h-6 w-6" />,
-          color: 'text-orange-600',
-          bgColor: 'bg-orange-50',
-          description: '3D modeling, rendering and visualization services'
+          shortTitle: '3D'
         };
       default:
         return {
           title: 'General Estimate',
-          icon: <FileText className="h-6 w-6" />,
-          color: 'text-gray-600',
-          bgColor: 'bg-gray-50',
-          description: 'General estimate services'
+          shortTitle: 'General'
         };
     }
   };
 
   const typeInfo = getEstimateTypeInfo();
 
-  const handleInputChange = (field: keyof GeneralEstimateForm, value: string) => {
-    setEstimateForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  const handleAddItem = () => {
+    const newItem: EstimateItem = {
+      id: Date.now().toString(),
+      particulars: '',
+      amountPerSqFt: 0,
+      sqFeet: 0,
+      totalAmount: 0
+    };
+    setItems([...items, newItem]);
+    setEditingItem(newItem);
+    setEditingItemData(newItem);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      // Here you would typically send the data to your API
-      console.log("General estimate data:", estimateForm);
-      
-      // Show success alert
+  const handleEditItem = (item: EstimateItem) => {
+    setEditingItem(item);
+    setEditingItemData({ ...item });
+  };
+
+  const handleSaveEdit = (itemId: string) => {
+    if (!editingItemData) return;
+
+    const updatedItem: EstimateItem = {
+      ...editingItemData,
+      id: itemId,
+      totalAmount: editingItemData.amountPerSqFt * editingItemData.sqFeet
+    };
+
+    setItems(prev => prev.map(item => item.id === itemId ? updatedItem : item));
+    setEditingItem(null);
+    setEditingItemData(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingItem(null);
+    setEditingItemData(null);
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    Swal.fire({
+      title: 'Are you sure?',
+      text: 'This action cannot be undone',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, remove it!',
+      cancelButtonText: 'Cancel'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        setItems(prev => prev.filter(item => item.id !== itemId));
       Swal.fire({
         icon: 'success',
-        title: `${typeInfo.title} Created!`,
-        text: `Estimate for ${clientName} has been prepared successfully.`,
+          title: 'Removed!',
+          text: 'Item has been removed.',
+          position: 'top-end',
+          toast: true,
+          showConfirmButton: false,
+          timer: 2000
+        });
+      }
+    });
+  };
+
+  const calculateGrandTotal = () => {
+    const subtotal = items.reduce((sum, item) => sum + item.totalAmount, 0);
+    let grandTotal = subtotal;
+    
+    if (discountType === 'percentage' && discount > 0) {
+      grandTotal = subtotal - (subtotal * discount / 100);
+    } else if (discountType === 'fixed' && discount > 0) {
+      grandTotal = subtotal - discount;
+    }
+    
+    return { subtotal, grandTotal };
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!clientName || items.length === 0 || !clientId) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Missing Information',
+        text: 'Please add client details and at least one item to download.',
         position: 'top-end',
         toast: true,
         showConfirmButton: false,
-        timer: 3000,
-        timerProgressBar: true,
-        background: '#f0f9ff',
-        color: '#1e40af',
-        iconColor: '#10b981'
+        timer: 3000
+      });
+      return;
+    }
+
+    // Save to database first
+    try {
+      const { subtotal, grandTotal } = calculateGrandTotal();
+      
+      const response = await fetch('/api/general-estimates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientId,
+          estimateName: estimateName || `${typeInfo.title}`,
+          items,
+          totalAmount: grandTotal,
+          subtotal,
+          discount,
+          discountType,
+          estimateType: estimateType || 'other'
+        }),
       });
 
-      // Reset form
-      setEstimateForm({
-        estimateType: estimateType || "",
-        projectScope: "",
-        area: "",
-        complexity: "",
-        timeline: "",
-        budget: "",
-        description: ""
-      });
+      if (!response.ok) {
+        throw new Error('Failed to save estimate');
+      }
 
+      // Show success message
+      await Swal.fire({
+        icon: 'success',
+        title: 'Saved!',
+        text: 'Estimate has been saved to database.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 2000
+      });
     } catch (error) {
-      console.error('Error creating estimate:', error);
-      Swal.fire({
+      console.error('Error saving estimate:', error);
+      await Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'Failed to create estimate',
+        text: 'Failed to save estimate to database. Proceeding with download.',
         position: 'top-end',
         toast: true,
         showConfirmButton: false,
-        timer: 4000,
-        background: '#fef2f2',
-        color: '#dc2626',
-        iconColor: '#ef4444'
+        timer: 3000
       });
     }
+
+    // Now download PDF
+    const doc = new jsPDF();
+    const { subtotal, grandTotal } = calculateGrandTotal();
+
+    // Header
+    doc.setFontSize(20);
+    doc.text(`${typeInfo.title}`, 14, 20);
+    
+    doc.setFontSize(12);
+    doc.text(`Client: ${clientName}`, 14, 30);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 36);
+    
+    if (estimateName) {
+      doc.text(`Estimate Name: ${estimateName}`, 14, 42);
+    }
+
+    // Table data
+    const tableData = items.map(item => [
+      item.particulars,
+      item.sqFeet.toFixed(2),
+      `₹${item.amountPerSqFt.toFixed(2)}`,
+      `₹${item.totalAmount.toFixed(2)}`
+    ]);
+
+    // Add table
+    autoTable(doc, {
+      head: [['Particulars', 'Sq Feet', 'Amount per sq ft', 'Total']],
+      body: tableData,
+      startY: estimateName ? 48 : 42,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] },
+      columnStyles: {
+        0: { cellWidth: 90 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 35 }
+      }
+    });
+
+    // Get final Y position after table
+    let finalY = (doc as any).lastAutoTable.finalY;
+
+    // Totals
+    finalY += 10;
+    doc.setFontSize(12);
+    doc.text(`Subtotal: ₹${subtotal.toFixed(2)}`, 150, finalY);
+    
+    if (discount > 0) {
+      const discountAmount = discountType === 'percentage' 
+        ? (subtotal * discount / 100) 
+        : discount;
+      finalY += 6;
+      doc.text(`Discount: -₹${discountAmount.toFixed(2)}`, 150, finalY);
+    }
+    
+    finalY += 6;
+    doc.setFontSize(14);
+    doc.text(`Grand Total: ₹${grandTotal.toFixed(2)}`, 150, finalY);
+
+    // Save PDF
+    doc.save(`${typeInfo.shortTitle}_Estimate_${clientName}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const handleBackToEstimates = () => {
     router.push(`/dashboard/estimates?clientId=${clientId}&clientName=${clientName}`);
   };
 
+  const { subtotal, grandTotal } = calculateGrandTotal();
+
   return (
-    <div className="space-y-8">
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-8">
         <div className="flex items-center space-x-4">
           <button
             onClick={handleBackToEstimates}
@@ -151,163 +290,246 @@ export default function GeneralEstimatePage() {
           </button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{typeInfo.title}</h1>
-            <p className="text-gray-600 mt-1">
-              {clientName ? `Preparing ${typeInfo.title.toLowerCase()} for ${clientName}` : `Prepare ${typeInfo.title.toLowerCase()}`}
-            </p>
+              <p className="text-gray-600 mt-1">{clientName ? `Estimate for ${clientName}` : 'Prepare Estimate'}</p>
           </div>
         </div>
       </div>
 
       {/* Client Info */}
       {clientName && (
-        <div className={`${typeInfo.bgColor} border border-gray-200 rounded-xl p-6`}>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
           <div className="flex items-center">
-            <div className={typeInfo.color}>
-              {typeInfo.icon}
+              <div className="bg-blue-100 p-3 rounded-lg">
+                <div className="text-blue-600 text-xl font-bold">{typeInfo.shortTitle}</div>
             </div>
-            <div className="ml-3">
+              <div className="ml-4">
               <h3 className="text-lg font-semibold text-gray-800">Client: {clientName}</h3>
-              <p className="text-gray-700">{typeInfo.description}</p>
+                <p className="text-gray-700">{typeInfo.title}</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Estimate Form */}
-      <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg border border-white/20 p-6">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">{typeInfo.title} Form</h2>
-          <p className="text-gray-600">Fill in the details to prepare the estimate</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Estimate Name and Discount */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="projectScope" className="block text-sm font-medium text-gray-700 mb-2">
-                Project Scope
-              </label>
-              <select
-                id="projectScope"
-                value={estimateForm.projectScope}
-                onChange={(e) => handleInputChange('projectScope', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-black"
-                required
-              >
-                <option value="">Select project scope</option>
-                <option value="small">Small Project</option>
-                <option value="medium">Medium Project</option>
-                <option value="large">Large Project</option>
-                <option value="enterprise">Enterprise Project</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="area" className="block text-sm font-medium text-gray-700 mb-2">
-                Project Area
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Estimate Name
               </label>
               <input
                 type="text"
-                id="area"
-                value={estimateForm.area}
-                onChange={(e) => handleInputChange('area', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-black"
-                placeholder="Enter project area/size"
-                required
+                value={estimateName}
+                onChange={(e) => setEstimateName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black placeholder:text-gray-400"
+                placeholder="Enter estimate name"
               />
             </div>
-
             <div>
-              <label htmlFor="complexity" className="block text-sm font-medium text-gray-700 mb-2">
-                Project Complexity
-              </label>
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">Discount</h3>
+              <div className="grid grid-cols-2 gap-4">
+            <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
               <select
-                id="complexity"
-                value={estimateForm.complexity}
-                onChange={(e) => handleInputChange('complexity', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-black"
-                required
-              >
-                <option value="">Select complexity level</option>
-                <option value="simple">Simple</option>
-                <option value="moderate">Moderate</option>
-                <option value="complex">Complex</option>
-                <option value="very-complex">Very Complex</option>
+                    value={discountType}
+                    onChange={(e) => setDiscountType(e.target.value as 'percentage' | 'fixed')}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-black"
+                  >
+                    <option value="percentage">Percentage</option>
+                    <option value="fixed">Fixed</option>
               </select>
             </div>
-
             <div>
-              <label htmlFor="timeline" className="block text-sm font-medium text-gray-700 mb-2">
-                Project Timeline
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {discountType === 'percentage' ? '(%)' : '(₹)'}
               </label>
-              <select
-                id="timeline"
-                value={estimateForm.timeline}
-                onChange={(e) => handleInputChange('timeline', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-black"
-                required
-              >
-                <option value="">Select timeline</option>
-                <option value="1-2weeks">1-2 Weeks</option>
-                <option value="1month">1 Month</option>
-                <option value="2-3months">2-3 Months</option>
-                <option value="3-6months">3-6 Months</option>
-                <option value="6+months">6+ Months</option>
-              </select>
+                  <input
+                    type="number"
+                    value={discount}
+                    onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-black placeholder:text-gray-400"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
             </div>
 
-            <div>
-              <label htmlFor="budget" className="block text-sm font-medium text-gray-700 mb-2">
-                Budget Range
-              </label>
-              <select
-                id="budget"
-                value={estimateForm.budget}
-                onChange={(e) => handleInputChange('budget', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-black"
-                required
+        {/* Items Table */}
+        <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">Estimate Items</h2>
+              <button
+                onClick={handleAddItem}
+                className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
-                <option value="">Select budget range</option>
-                <option value="under-10k">Under $10,000</option>
-                <option value="10k-25k">$10,000 - $25,000</option>
-                <option value="25k-50k">$25,000 - $50,000</option>
-                <option value="50k-100k">$50,000 - $100,000</option>
-                <option value="100k+">$100,000+</option>
-              </select>
+                <Plus className="h-4 w-4" />
+                <span>Add Item</span>
+              </button>
             </div>
           </div>
 
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-              Project Description
-            </label>
-            <textarea
-              id="description"
-              value={estimateForm.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-black"
-              placeholder="Describe your project requirements..."
-              required
-            />
+          {items.length === 0 ? (
+            <div className="p-12 text-center">
+              <p className="text-gray-500">No items added yet. Click "Add Item" to get started.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Particulars</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Sq Feet</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Amount per sq ft</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Total</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                      <td className="py-3 px-4 text-black">
+                        {editingItem?.id === item.id ? (
+                          <input
+                            type="text"
+                            value={editingItemData?.particulars || ''}
+                            onChange={(e) => setEditingItemData(prev => prev ? { ...prev, particulars: e.target.value } : null)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-black"
+                          />
+                        ) : (
+                          item.particulars || '-'
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-black text-center">
+                        {editingItem?.id === item.id ? (
+                          <input
+                            type="number"
+                            value={editingItemData?.sqFeet || 0}
+                            onChange={(e) => {
+                              const newSqFeet = parseFloat(e.target.value) || 0;
+                              const amountPerSqFt = editingItemData?.amountPerSqFt || 0;
+                              const newTotal = newSqFeet * amountPerSqFt;
+                              setEditingItemData(prev => prev ? { ...prev, sqFeet: newSqFeet, totalAmount: newTotal } : null);
+                            }}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-black text-center"
+                          />
+                        ) : (
+                          item.sqFeet.toFixed(2)
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-black text-center">
+                        {editingItem?.id === item.id ? (
+                          <input
+                            type="number"
+                            value={editingItemData?.amountPerSqFt || 0}
+                            onChange={(e) => {
+                              const newAmountPerSqFt = parseFloat(e.target.value) || 0;
+                              const sqFeet = editingItemData?.sqFeet || 0;
+                              const newTotal = sqFeet * newAmountPerSqFt;
+                              setEditingItemData(prev => prev ? { ...prev, amountPerSqFt: newAmountPerSqFt, totalAmount: newTotal } : null);
+                            }}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-black text-center"
+                          />
+                        ) : (
+                          `₹${item.amountPerSqFt.toFixed(2)}`
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-sm font-semibold text-green-600">
+                        <div className="text-center">
+                          ₹{(editingItemData?.totalAmount || item.totalAmount).toFixed(2)}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex space-x-2">
+                          {editingItem?.id === item.id ? (
+                            <>
+                              <button
+                                onClick={() => handleSaveEdit(item.id)}
+                                className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                title="Save Changes"
+                              >
+                                <Save className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                title="Cancel Edit"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleEditItem(item)}
+                                className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                title="Edit Item"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleRemoveItem(item.id)}
+                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                title="Remove Item"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Totals */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="space-y-2">
+            <div className="flex justify-between text-gray-700">
+              <span className="font-medium">Subtotal:</span>
+              <span className="font-semibold">₹{subtotal.toFixed(2)}</span>
+            </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-red-600">
+                <span className="font-medium">
+                  Discount ({discountType === 'percentage' ? `${discount}%` : '₹' + discount}):
+                </span>
+                <span className="font-semibold">
+                  -₹{(discountType === 'percentage' ? (subtotal * discount / 100) : discount).toFixed(2)}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between text-xl font-bold text-blue-600 border-t pt-2 mt-2">
+              <span>Grand Total:</span>
+              <span>₹{grandTotal.toFixed(2)}</span>
+            </div>
+          </div>
           </div>
 
-          <div className="flex gap-4 pt-6">
+        {/* Action Buttons */}
+        <div className="flex space-x-4">
             <button
-              type="button"
               onClick={handleBackToEstimates}
-              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
             >
               Back to Estimates
             </button>
             <button
-              type="submit"
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 cursor-pointer"
+            onClick={handleDownloadPDF}
+            disabled={items.length === 0}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2 text-sm"
             >
-              <Save className="h-5 w-5 mr-2 inline" />
-              Create Estimate
+            <Download className="h-4 w-4" />
+            <span>Save and Download</span>
             </button>
           </div>
-        </form>
       </div>
     </div>
   );

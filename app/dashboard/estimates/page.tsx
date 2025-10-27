@@ -4,10 +4,8 @@ import { useState, useEffect } from "react";
 import { 
   FileText, 
   Home, 
-  Building, 
   ArrowLeft,
-  CheckCircle,
-  Star
+  CheckCircle
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -50,6 +48,28 @@ interface Estimate {
   user?: User;
 }
 
+interface GeneralEstimate {
+  _id: string;
+  userId: string;
+  clientId: string;
+  estimateName: string;
+  estimateType: string;
+  items: Array<{
+    id: string;
+    particulars: string;
+    amountPerSqFt: number;
+    sqFeet: number;
+    totalAmount: number;
+  }>;
+  totalAmount: number;
+  subtotal: number;
+  discount?: number;
+  discountType?: 'percentage' | 'fixed';
+  status?: 'pending' | 'approved' | 'completed';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function EstimatesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -58,6 +78,7 @@ export default function EstimatesPage() {
 
   const [selectedEstimateType, setSelectedEstimateType] = useState<string | null>(null);
   const [clientEstimates, setClientEstimates] = useState<Estimate[]>([]);
+  const [generalEstimates, setGeneralEstimates] = useState<GeneralEstimate[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch client estimates from API
@@ -67,34 +88,41 @@ export default function EstimatesPage() {
       
       setLoading(true);
       try {
-        const response = await fetch(`/api/interior-estimates/client/${clientId}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch estimates');
+        // Fetch interior estimates
+        const interiorResponse = await fetch(`/api/interior-estimates/client/${clientId}`);
+        if (interiorResponse.ok) {
+          const data = await interiorResponse.json();
+          const estimates = data.estimates || [];
+          
+          // Fetch user details for each estimate
+          const estimatesWithUsers = await Promise.all(
+            estimates.map(async (estimate: Estimate) => {
+              try {
+                const userResponse = await fetch(`/api/users/${estimate.userId}`);
+                if (userResponse.ok) {
+                  const userData = await userResponse.json();
+                  return { ...estimate, user: userData.user };
+                }
+              } catch (error) {
+                console.error('Error fetching user details:', error);
+              }
+              return estimate;
+            })
+          );
+          
+          setClientEstimates(estimatesWithUsers);
         }
         
-        const data = await response.json();
-        const estimates = data.estimates || [];
-        
-        // Fetch user details for each estimate
-        const estimatesWithUsers = await Promise.all(
-          estimates.map(async (estimate: Estimate) => {
-            try {
-              const userResponse = await fetch(`/api/users/${estimate.userId}`);
-              if (userResponse.ok) {
-                const userData = await userResponse.json();
-                return { ...estimate, user: userData.user };
-              }
-            } catch (error) {
-              console.error('Error fetching user details:', error);
-            }
-            return estimate;
-          })
-        );
-        
-        setClientEstimates(estimatesWithUsers);
+        // Fetch general estimates
+        const generalResponse = await fetch(`/api/general-estimates?clientId=${clientId}`);
+        if (generalResponse.ok) {
+          const data = await generalResponse.json();
+          setGeneralEstimates(data.estimates || []);
+        }
       } catch (error) {
-        console.error('Error fetching client estimates:', error);
+        console.error('Error fetching estimates:', error);
         setClientEstimates([]);
+        setGeneralEstimates([]);
       } finally {
         setLoading(false);
       }
@@ -113,28 +141,12 @@ export default function EstimatesPage() {
       bgColor: "bg-purple-50"
     },
     {
-      id: "permit",
-      name: "Permit",
-      description: "Building permits and regulatory compliance services",
+      id: "other",
+      name: "General Estimate",
+      description: "General estimates with custom items and specifications",
       icon: <FileText className="h-8 w-8" />,
       color: "text-blue-600",
       bgColor: "bg-blue-50"
-    },
-    {
-      id: "building",
-      name: "Building Estimation",
-      description: "Complete building construction and structural services",
-      icon: <Building className="h-8 w-8" />,
-      color: "text-green-600",
-      bgColor: "bg-green-50"
-    },
-    {
-      id: "3d",
-      name: "3D",
-      description: "3D modeling, rendering and visualization services",
-      icon: <Star className="h-8 w-8" />,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50"
     }
   ];
 
@@ -146,8 +158,8 @@ export default function EstimatesPage() {
       // Redirect to interior estimate page
       router.push(`/dashboard/estimates/interior?clientId=${clientId}&clientName=${clientName}`);
     } else {
-      // Redirect to general estimate page for permit, building, and 3d
-      router.push(`/dashboard/estimates/general?clientId=${clientId}&clientName=${clientName}&type=${typeId}`);
+      // Redirect to general estimate page for other estimates
+      router.push(`/dashboard/estimates/general?clientId=${clientId}&clientName=${clientName}&type=other`);
     }
   };
 
@@ -242,65 +254,115 @@ export default function EstimatesPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <span className="ml-3 text-gray-600">Loading estimates...</span>
           </div>
-        ) : clientEstimates.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {clientEstimates.map((estimate) => (
-            <div
-              key={estimate._id}
-              onClick={() => {
-                if (estimate.status === 'completed') {
-                  router.push(`/dashboard/interior-work/completed/${estimate._id}/details`);
-                } else {
-                  router.push(`/dashboard/estimates/interior/${estimate._id}`);
-                }
-              }}
-              className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-200 cursor-pointer"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Home className="h-5 w-5 text-purple-600" />
+        ) : (clientEstimates.length > 0 || generalEstimates.length > 0) ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Interior Estimates */}
+            {clientEstimates.map((estimate) => (
+              <div
+                key={estimate._id}
+                onClick={() => {
+                  if (estimate.status === 'completed') {
+                    router.push(`/dashboard/interior-work/completed/${estimate._id}/details`);
+                  } else {
+                    router.push(`/dashboard/estimates/interior/${estimate._id}`);
+                  }
+                }}
+                className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-200 cursor-pointer"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Home className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {estimate.createdAt ? new Date(estimate.createdAt).toLocaleDateString() : 'N/A'}
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500">
-                  {estimate.createdAt ? new Date(estimate.createdAt).toLocaleDateString() : 'N/A'}
-                </div>
-              </div>
-              
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-gray-900 text-lg">
-                    {estimate.estimateName}
-                  </h4>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    estimate.status === 'approved' 
-                      ? 'bg-green-100 text-green-800' 
-                      : estimate.status === 'completed'
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {estimate.status === 'approved' ? 'Approved' : estimate.status === 'completed' ? 'Completed' : 'Pending'}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 mb-3">
-                  {estimate.items.length} items • Interior Estimate
-                </p>
-                {estimate.user && (
-                  <p className="text-xs text-gray-500">
-                    Created by: {estimate.user.name || estimate.user.email}
+                
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-gray-900 text-lg">
+                      {estimate.estimateName}
+                    </h4>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      estimate.status === 'approved' 
+                        ? 'bg-green-100 text-green-800' 
+                        : estimate.status === 'completed'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {estimate.status === 'approved' ? 'Approved' : estimate.status === 'completed' ? 'Completed' : 'Pending'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-3">
+                    {estimate.items.length} items • Interior Estimate
                   </p>
-                )}
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold text-gray-900">
-                  ₹{Math.round(estimate.totalAmount).toLocaleString()}
+                  {estimate.user && (
+                    <p className="text-xs text-gray-500">
+                      Created by: {estimate.user.name || estimate.user.email}
+                    </p>
+                  )}
                 </div>
-                <div className="text-xs text-gray-500">
-                  Updated {estimate.updatedAt ? new Date(estimate.updatedAt).toLocaleDateString() : 'N/A'}
+                
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold text-gray-900">
+                    ₹{Math.round(estimate.totalAmount).toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Updated {estimate.updatedAt ? new Date(estimate.updatedAt).toLocaleDateString() : 'N/A'}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+
+            {/* General Estimates */}
+            {generalEstimates.map((estimate) => (
+              <div
+                key={estimate._id}
+                onClick={() => {
+                  router.push(`/dashboard/estimates/general/${estimate._id}`);
+                }}
+                className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-200 cursor-pointer"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <FileText className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {estimate.createdAt ? new Date(estimate.createdAt).toLocaleDateString() : 'N/A'}
+                  </div>
+                </div>
+                
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-gray-900 text-lg">
+                      {estimate.estimateName}
+                    </h4>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      estimate.status === 'approved' 
+                        ? 'bg-green-100 text-green-800' 
+                        : estimate.status === 'completed'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {estimate.status === 'approved' ? 'Approved' : estimate.status === 'completed' ? 'Completed' : 'Pending'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-3">
+                    {estimate.items.length} items • General Estimate
+                  </p>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold text-gray-900">
+                    ₹{Math.round(estimate.totalAmount).toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Updated {estimate.updatedAt ? new Date(estimate.updatedAt).toLocaleDateString() : 'N/A'}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="text-center py-8">
             <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
