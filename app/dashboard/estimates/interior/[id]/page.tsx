@@ -69,6 +69,7 @@ interface Item {
   runningMeasurements?: RunningMeasurement[];
   description: string;
   totalAmount: number;
+  amountPerSqFt?: number;
 }
 
 interface Estimate {
@@ -677,12 +678,12 @@ export default function InteriorEstimateDetailsPage() {
                   totalSqFeet = (item.length * item.breadth) / 929.03;
                 }
 
-                const amountPerSqFt = totalSqFeet > 0 ? item.totalAmount / totalSqFeet : 0;
+                const amountPerSqFt = item.amountPerSqFt || 0;
                 
                 const row = [
                   combinedText,
                   measurements,
-                  totalSqFeet.toFixed(1),
+                  customRoundSqFeet(totalSqFeet).toFixed(1),
                   `Rs ${amountPerSqFt.toFixed(1)}`,
                   `Rs ${item.totalAmount.toFixed(1)}`
                 ];
@@ -1174,6 +1175,16 @@ We look forward to bringing your vision to life!
     const sqCm = lengthCm * breadthCm;
     const result = sqCm / 929.03;
     return isFinite(result) ? result : 0;
+  };
+
+  const customRoundSqFeet = (value: number): number => {
+    const floorValue = Math.floor(value);
+    const decimal = value - floorValue;
+    if (decimal >= 0.5) {
+      return Math.ceil(value);
+    } else {
+      return floorValue;
+    }
   };
 
   const calculateTotalSqFeet = (measurements: Measurement[]): number => {
@@ -1946,7 +1957,7 @@ We look forward to bringing your vision to life!
                                                     const singleSqFeet = cmToSqFeet(editingItemData?.length || 0, editingItemData?.breadth || 0);
                                                     const measurementsSqFeet = editingItemData?.measurements ? calculateTotalSqFeet(editingItemData.measurements) : 0;
                                                     const total = singleSqFeet + measurementsSqFeet;
-                                                    return total.toFixed(2);
+                                                    return customRoundSqFeet(total).toFixed(2);
                                                   })()} sq ft
                                                 </div>
                                               ) : (
@@ -1956,7 +1967,7 @@ We look forward to bringing your vision to life!
                                                       const singleSqFeet = cmToSqFeet(item.length || 0, item.breadth || 0);
                                                       const measurementsSqFeet = item.measurements ? calculateTotalSqFeet(item.measurements) : 0;
                                                       const total = singleSqFeet + measurementsSqFeet;
-                                                      return total.toFixed(2);
+                                                      return customRoundSqFeet(total).toFixed(2);
                                                     })()}
                                                   </div>
                                                 ) : '-'
@@ -2124,12 +2135,11 @@ We look forward to bringing your vision to life!
                                               ₹{(() => {
                                                 let amount = 0;
                                                 if (item.type === 'area') {
-                                                  const sqFeet = cmToSqFeet(item.length || 0, item.breadth || 0);
-                                                  amount = sqFeet > 0 ? (item.totalAmount / sqFeet) : 0;
+                                                  amount = item.amountPerSqFt || 0;
                                                 } else if (item.type === 'pieces') {
                                                   amount = (item.pieces || 0) > 0 ? (item.totalAmount / (item.pieces || 1)) : 0;
                                                 } else {
-                                                  amount = item.totalAmount;
+                                                  amount = item.amountPerSqFt || 0;
                                                 }
                                                 return isFinite(amount) ? amount.toFixed(2) : '0.00';
                                               })().toLocaleString()}
@@ -2310,7 +2320,7 @@ We look forward to bringing your vision to life!
                                               const measurementsSqFeet = item.measurements ? 
                                                 item.measurements.reduce((total, m) => total + cmToSqFeet(m.length, m.breadth), 0) : 0;
                                               const total = singleSqFeet + measurementsSqFeet;
-                                              return total.toFixed(1);
+                                              return customRoundSqFeet(total).toFixed(1);
                                             })()}
                                           </div>
                                         ) : '-'
@@ -2367,12 +2377,11 @@ We look forward to bringing your vision to life!
                                       ₹{(() => {
                                         let amount = 0;
                                         if (item.type === 'area') {
-                                          const sqFeet = cmToSqFeet(item.length || 0, item.breadth || 0);
-                                          amount = sqFeet > 0 ? (item.totalAmount / sqFeet) : 0;
+                                          amount = item.amountPerSqFt || 0;
                                         } else if (item.type === 'pieces') {
                                           amount = (item.pieces || 0) > 0 ? (item.totalAmount / (item.pieces || 1)) : 0;
                                         } else {
-                                          amount = item.totalAmount;
+                                          amount = item.amountPerSqFt || 0;
                                         }
                                         return isFinite(amount) ? amount.toFixed(1) : '0.0';
                                       })().toLocaleString()}
