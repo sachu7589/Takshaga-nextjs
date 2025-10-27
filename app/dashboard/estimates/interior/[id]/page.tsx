@@ -1997,7 +1997,9 @@ We look forward to bringing your vision to life!
                                                 value={editingItemData?.pieces || item.pieces || 0}
                                                 onChange={(e) => {
                                                   const newPieces = parseInt(e.target.value) || 0;
-                                                  setEditingItemData(prev => prev ? { ...prev, pieces: newPieces } : null);
+                                                  const amountPerSqFt = editingItemData?.amountPerSqFt || item.amountPerSqFt || 0;
+                                                  const newTotal = newPieces * amountPerSqFt;
+                                                  setEditingItemData(prev => prev ? { ...prev, pieces: newPieces, totalAmount: newTotal } : null);
                                                   updateItemTotal(item.id, { pieces: newPieces });
                                                 }}
                                                 className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
@@ -2139,7 +2141,17 @@ We look forward to bringing your vision to life!
                                               value={editingItemData?.amountPerSqFt ?? item.amountPerSqFt ?? 0}
                                               onChange={(e) => {
                                                 const newAmountPerSqFt = parseFloat(e.target.value) || 0;
-                                                setEditingItemData(prev => prev ? { ...prev, amountPerSqFt: newAmountPerSqFt } : null);
+                                                const newTotal = calculateTotalAmount(
+                                                  item.type,
+                                                  editingItemData?.length || item.length || 0,
+                                                  editingItemData?.breadth || item.breadth || 0,
+                                                  editingItemData?.pieces || item.pieces || 0,
+                                                  editingItemData?.runningLength || item.runningLength || 0,
+                                                  newAmountPerSqFt,
+                                                  editingItemData?.measurements || item.measurements,
+                                                  editingItemData?.runningMeasurements || item.runningMeasurements
+                                                );
+                                                setEditingItemData(prev => prev ? { ...prev, amountPerSqFt: newAmountPerSqFt, totalAmount: newTotal } : null);
                                                 updateItemTotal(item.id, { amountPerSqFt: newAmountPerSqFt });
                                               }}
                                               className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
