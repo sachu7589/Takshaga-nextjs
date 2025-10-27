@@ -39,6 +39,14 @@ interface GeneralEstimate {
   updatedAt: string;
 }
 
+interface ClientDetails {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  location?: string;
+}
+
 export default function GeneralEstimateViewPage() {
   const router = useRouter();
   const params = useParams();
@@ -46,7 +54,7 @@ export default function GeneralEstimateViewPage() {
 
   const [estimate, setEstimate] = useState<GeneralEstimate | null>(null);
   const [loading, setLoading] = useState(true);
-  const [clientDetails, setClientDetails] = useState<any>(null);
+  const [clientDetails, setClientDetails] = useState<ClientDetails | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedEstimate, setEditedEstimate] = useState<GeneralEstimate | null>(null);
   const [editingItem, setEditingItem] = useState<EstimateItem | null>(null);
@@ -152,7 +160,6 @@ export default function GeneralEstimateViewPage() {
       return;
     }
 
-    const { title } = getEstimateTypeInfo();
     const doc = new jsPDF();
     const { subtotal, grandTotal } = calculateGrandTotal();
 
@@ -668,7 +675,7 @@ export default function GeneralEstimateViewPage() {
                       )}
                     </td>
                     <td className="py-3 px-4 text-sm font-semibold text-green-600 text-center">
-                      ₹{(isEditMode && editingItem?.id === item.id ? editingItemData?.totalAmount : item.totalAmount).toFixed(2)}
+                      ₹{(isEditMode && editingItem?.id === item.id ? (editingItemData?.totalAmount || 0) : item.totalAmount).toFixed(2)}
                     </td>
                     {isEditMode && (
                       <td className="py-3 px-4">

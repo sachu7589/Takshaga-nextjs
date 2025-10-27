@@ -6,10 +6,10 @@ import GeneralEstimate from '@/app/models/GeneralEstimate';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const estimateId = params.id;
+    const { id: estimateId } = await params;
 
     // Get current user from token
     let currentUser = getCurrentUser(request);

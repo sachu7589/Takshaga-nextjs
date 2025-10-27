@@ -247,7 +247,7 @@ export default function GeneralEstimatePage() {
     });
 
     // Get final Y position after table
-    let finalY = (doc as any).lastAutoTable.finalY;
+    let finalY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 
     // Totals
     finalY += 10;
@@ -374,7 +374,7 @@ export default function GeneralEstimatePage() {
 
           {items.length === 0 ? (
             <div className="p-12 text-center">
-              <p className="text-gray-500">No items added yet. Click "Add Item" to get started.</p>
+              <p className="text-gray-500">No items added yet. Click &quot;Add Item&quot; to get started.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
