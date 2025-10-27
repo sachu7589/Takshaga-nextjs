@@ -425,6 +425,13 @@ export default function InteriorEstimateDetailsPage() {
     
     const selectedSectionData = sections.find(section => section.id === sectionId);
     if (selectedSectionData) {
+      // Calculate initial total based on item type
+      let initialTotal = 0;
+      if (selectedSectionData.type === 'pieces') {
+        // For pieces, default to 1 piece
+        initialTotal = selectedSectionData.amount * 1;
+      }
+      
       const newItem: Item = {
         id: Date.now().toString(),
         sectionId: selectedSectionData.id,
@@ -434,10 +441,11 @@ export default function InteriorEstimateDetailsPage() {
         materialName: selectedSectionData.material,
         type: selectedSectionData.type,
         description: selectedSectionData.description,
-        totalAmount: selectedSectionData.amount,
+        amountPerSqFt: selectedSectionData.amount,
+        totalAmount: initialTotal,
         length: 0,
         breadth: 0,
-        pieces: 0,
+        ...(selectedSectionData.type === 'pieces' && { pieces: 1 }),
         runningLength: 0
       };
       
@@ -1347,6 +1355,7 @@ We look forward to bringing your vision to life!
       type: customItem.type,
       description: customItem.description,
       totalAmount: calculatedTotal,
+      amountPerSqFt: amountPerSqFt,
       ...(customItem.type === 'area' && {
         length: parseFloat(customItem.length) || 0,
         breadth: parseFloat(customItem.breadth) || 0,
@@ -1765,7 +1774,9 @@ We look forward to bringing your vision to life!
                                           <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Feet</th>
                                         </>
                                       )}
-                                      <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Amount per sq ft</th>
+                                      <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">
+                                        {categoryItems.some(item => item.type === 'pieces') ? 'Amount per piece' : 'Amount per sq ft'}
+                                      </th>
                                       <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Total</th>
                                       <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Actions</th>
                                     </tr>
@@ -2140,7 +2151,7 @@ We look forward to bringing your vision to life!
                                                 if (item.type === 'area') {
                                                   amount = item.amountPerSqFt || 0;
                                                 } else if (item.type === 'pieces') {
-                                                  amount = (item.pieces || 0) > 0 ? (item.totalAmount / (item.pieces || 1)) : 0;
+                                                  amount = item.amountPerSqFt || 0;
                                                 } else {
                                                   amount = item.amountPerSqFt || 0;
                                                 }
@@ -2265,7 +2276,9 @@ We look forward to bringing your vision to life!
                                     <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Feet</th>
                                   </>
                                 )}
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Amount per sq ft</th>
+                                <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">
+                                  {categoryItems.some(item => item.type === 'pieces') ? 'Amount per piece' : 'Amount per sq ft'}
+                                </th>
                                 <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Total</th>
                               </tr>
                             </thead>
@@ -2382,7 +2395,7 @@ We look forward to bringing your vision to life!
                                         if (item.type === 'area') {
                                           amount = item.amountPerSqFt || 0;
                                         } else if (item.type === 'pieces') {
-                                          amount = (item.pieces || 0) > 0 ? (item.totalAmount / (item.pieces || 1)) : 0;
+                                          amount = item.amountPerSqFt || 0;
                                         } else {
                                           amount = item.amountPerSqFt || 0;
                                         }
