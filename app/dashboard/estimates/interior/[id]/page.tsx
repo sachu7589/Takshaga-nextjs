@@ -458,7 +458,7 @@ export default function InteriorEstimateDetailsPage() {
     if (!editingItemData) return;
 
     // Recalculate total amount based on the type
-    const amountPerSqFt = editingItemData.totalAmount;
+    const amountPerSqFt = editingItemData.amountPerSqFt || 0;
     const calculatedTotal = calculateTotalAmount(
       editingItemData.type,
       editingItemData.length || 0,
@@ -473,6 +473,7 @@ export default function InteriorEstimateDetailsPage() {
     const updatedItem: Item = {
       ...editingItemData,
       id: itemId,
+      amountPerSqFt: editingItemData.amountPerSqFt,
       totalAmount: calculatedTotal
     };
 
@@ -1233,7 +1234,8 @@ We look forward to bringing your vision to life!
       const singleSqFeet = cmToSqFeet(length || 0, breadth || 0);
       const measurementsSqFeet = measurements ? calculateTotalSqFeet(measurements) : 0;
       const totalSqFeet = singleSqFeet + measurementsSqFeet;
-      total = totalSqFeet * (amountPerSqFt || 0);
+      const roundedSqFeet = customRoundSqFeet(totalSqFeet);
+      total = roundedSqFeet * (amountPerSqFt || 0);
     } else if (type === 'pieces') {
       total = (pieces || 0) * (amountPerSqFt || 0);
     } else if (type === 'running') {
@@ -1250,7 +1252,8 @@ We look forward to bringing your vision to life!
     setItems(prev => prev.map(item => {
       if (item.id === itemId) {
         const updatedItem = { ...item, ...newData };
-        const amountPerSqFt = updatedItem.totalAmount;
+        // Use the existing amountPerSqFt or the new one from newData
+        const amountPerSqFt = updatedItem.amountPerSqFt || 0;
         const calculatedTotal = calculateTotalAmount(
           updatedItem.type,
           updatedItem.length || 0,
@@ -2122,11 +2125,11 @@ We look forward to bringing your vision to life!
                                           {editingItem?.id === item.id ? (
                                             <input
                                               type="number"
-                                              value={editingItemData?.totalAmount || item.totalAmount}
+                                              value={editingItemData?.amountPerSqFt ?? item.amountPerSqFt ?? 0}
                                               onChange={(e) => {
-                                                const newAmount = parseFloat(e.target.value) || 0;
-                                                setEditingItemData(prev => prev ? { ...prev, totalAmount: newAmount } : null);
-                                                updateItemTotal(item.id, { totalAmount: newAmount });
+                                                const newAmountPerSqFt = parseFloat(e.target.value) || 0;
+                                                setEditingItemData(prev => prev ? { ...prev, amountPerSqFt: newAmountPerSqFt } : null);
+                                                updateItemTotal(item.id, { amountPerSqFt: newAmountPerSqFt });
                                               }}
                                               className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                                             />
