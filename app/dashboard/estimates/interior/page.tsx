@@ -486,7 +486,9 @@ export default function InteriorEstimatePage() {
           if (measurements && measurements.length > 0) {
             totalSqFeet += calculateTotalSqFeet(measurements);
           }
-          const result = totalSqFeet * amountPerSqFt;
+          // Use round value for calculation
+          const roundSqFeet = Math.round(totalSqFeet);
+          const result = roundSqFeet * amountPerSqFt;
           return isFinite(result) ? result : 0;
         }
         return 0;
@@ -508,7 +510,9 @@ export default function InteriorEstimatePage() {
           if (runningMeasurements && runningMeasurements.length > 0) {
             totalFeet += calculateTotalRunningFeet(runningMeasurements);
           }
-          const result = totalFeet * amountPerSqFt;
+          // Use round value for calculation
+          const roundFeet = Math.round(totalFeet);
+          const result = roundFeet * amountPerSqFt;
           return isFinite(result) ? result : 0;
         }
         return 0;
@@ -1390,7 +1394,7 @@ export default function InteriorEstimatePage() {
                                             const singleSqFeet = cmToSqFeet(editingItemData?.length || 0, editingItemData?.breadth || 0);
                                             const measurementsSqFeet = editingItemData?.measurements ? calculateTotalSqFeet(editingItemData.measurements) : 0;
                                             const total = singleSqFeet + measurementsSqFeet;
-                                            return total.toFixed(2);
+                                            return Math.round(total);
                                           })()} sq ft
                                         </div>
                                       ) : (
@@ -1400,7 +1404,7 @@ export default function InteriorEstimatePage() {
                                               const singleSqFeet = cmToSqFeet(item.length || 0, item.breadth || 0);
                                               const measurementsSqFeet = item.measurements ? calculateTotalSqFeet(item.measurements) : 0;
                                               const total = singleSqFeet + measurementsSqFeet;
-                                              return total.toFixed(2);
+                                              return Math.round(total);
                                             })()}
                                           </div>
                                         ) : '-'
@@ -1535,7 +1539,7 @@ export default function InteriorEstimatePage() {
                                             const singleFeet = cmToFeet(editingItemData?.runningLength || 0);
                                             const measurementsFeet = editingItemData?.runningMeasurements ? calculateTotalRunningFeet(editingItemData.runningMeasurements) : 0;
                                             const total = singleFeet + measurementsFeet;
-                                            return total.toFixed(2);
+                                            return Math.round(total);
                                           })()} ft
                                         </div>
                                       ) : (
@@ -1544,7 +1548,7 @@ export default function InteriorEstimatePage() {
                                             const singleFeet = cmToFeet(item.runningLength || 0);
                                             const measurementsFeet = item.runningMeasurements ? calculateTotalRunningFeet(item.runningMeasurements) : 0;
                                             const total = singleFeet + measurementsFeet;
-                                            return total.toFixed(2);
+                                            return Math.round(total);
                                           })()
                                         ) : '-'
                                       )}
