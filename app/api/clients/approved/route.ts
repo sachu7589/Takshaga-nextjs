@@ -1,8 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import Client from '@/app/models/Client';
 
-export async function GET(request: NextRequest) {
+interface InteriorEstimate {
+  clientId?: string | { toString: () => string };
+  status?: string;
+}
+
+export async function GET() {
   try {
     await dbConnect();
     
@@ -18,11 +23,11 @@ export async function GET(request: NextRequest) {
     const approvedEstimates = await mongoose.connection.db
       .collection('interior_estimates')
       .find({ status: 'approved' })
-      .toArray();
+      .toArray() as InteriorEstimate[];
     
     // Get unique client IDs from approved estimates
     const clientIds = new Set<string>();
-    approvedEstimates.forEach((est: any) => {
+    approvedEstimates.forEach((est) => {
       if (est.clientId) {
         clientIds.add(est.clientId.toString());
       }
