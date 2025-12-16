@@ -72,10 +72,11 @@ export async function POST(
       );
     }
 
-    // Delete all other estimates for the same client (excluding the approved one)
+    // Delete all other estimates for the same client (excluding the approved one and completed estimates)
     const deleteResult = await mongoose.connection.db.collection('interior_estimates').deleteMany({
       clientId: clientId,
-      _id: { $ne: new mongoose.Types.ObjectId(id) }
+      _id: { $ne: new mongoose.Types.ObjectId(id) },
+      status: { $ne: 'completed' }
     });
 
     // Insert stage data
