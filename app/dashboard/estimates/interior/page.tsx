@@ -376,7 +376,21 @@ export default function InteriorEstimatePage() {
     const updatedMeasurements = [...(item.measurements || []), measurement];
     // Preserve the amountPerSqFt when updating
     updateItemTotal(item.id, { measurements: updatedMeasurements, amountPerSqFt: item.amountPerSqFt });
-    setEditingItemData(prev => prev ? { ...prev, measurements: updatedMeasurements } : null);
+    const updatedData = editingItemData ? { ...editingItemData, measurements: updatedMeasurements } : null;
+    if (updatedData) {
+      const amountPerSqFt = updatedData.amountPerSqFt || item.amountPerSqFt || 0;
+      const calculatedTotal = calculateTotalAmount(
+        updatedData.type,
+        updatedData.length || 0,
+        updatedData.breadth || 0,
+        updatedData.pieces || 0,
+        updatedData.runningLength || 0,
+        amountPerSqFt,
+        updatedData.measurements,
+        updatedData.runningMeasurements
+      );
+      setEditingItemData({ ...updatedData, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 });
+    }
   };
 
   const addRunningMeasurementDirectly = (item: Item) => {
@@ -388,7 +402,21 @@ export default function InteriorEstimatePage() {
     const updatedRunningMeasurements = [...(item.runningMeasurements || []), runningMeasurement];
     // Preserve the amountPerSqFt when updating
     updateItemTotal(item.id, { runningMeasurements: updatedRunningMeasurements, amountPerSqFt: item.amountPerSqFt });
-    setEditingItemData(prev => prev ? { ...prev, runningMeasurements: updatedRunningMeasurements } : null);
+    const updatedData = editingItemData ? { ...editingItemData, runningMeasurements: updatedRunningMeasurements } : null;
+    if (updatedData) {
+      const amountPerSqFt = updatedData.amountPerSqFt || item.amountPerSqFt || 0;
+      const calculatedTotal = calculateTotalAmount(
+        updatedData.type,
+        updatedData.length || 0,
+        updatedData.breadth || 0,
+        updatedData.pieces || 0,
+        updatedData.runningLength || 0,
+        amountPerSqFt,
+        updatedData.measurements,
+        updatedData.runningMeasurements
+      );
+      setEditingItemData({ ...updatedData, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 });
+    }
   };
 
   const addMeasurementToItem = () => {
@@ -1242,7 +1270,21 @@ export default function InteriorEstimatePage() {
                                               value={editingItemData?.length || item.length || 0}
                                               onChange={(e) => {
                                                 const newLength = parseFloat(e.target.value) || 0;
-                                                setEditingItemData(prev => prev ? { ...prev, length: newLength } : null);
+                                                const updatedData = editingItemData ? { ...editingItemData, length: newLength } : null;
+                                                if (updatedData) {
+                                                  const amountPerSqFt = updatedData.amountPerSqFt || item.amountPerSqFt || 0;
+                                                  const calculatedTotal = calculateTotalAmount(
+                                                    updatedData.type,
+                                                    updatedData.length || 0,
+                                                    updatedData.breadth || 0,
+                                                    updatedData.pieces || 0,
+                                                    updatedData.runningLength || 0,
+                                                    amountPerSqFt,
+                                                    updatedData.measurements,
+                                                    updatedData.runningMeasurements
+                                                  );
+                                                  setEditingItemData({ ...updatedData, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 });
+                                                }
                                                 updateItemTotal(item.id, { length: newLength, amountPerSqFt: item.amountPerSqFt });
                                               }}
                                               className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
@@ -1261,7 +1303,21 @@ export default function InteriorEstimatePage() {
                                                       const newMeasurements = editingItemData.measurements?.map(m => 
                                                         m.id === measurement.id ? { ...m, length: parseFloat(e.target.value) || 0 } : m
                                                       ) || [];
-                                                      setEditingItemData(prev => prev ? { ...prev, measurements: newMeasurements } : null);
+                                                      const updatedData = editingItemData ? { ...editingItemData, measurements: newMeasurements } : null;
+                                                      if (updatedData) {
+                                                        const amountPerSqFt = updatedData.amountPerSqFt || item.amountPerSqFt || 0;
+                                                        const calculatedTotal = calculateTotalAmount(
+                                                          updatedData.type,
+                                                          updatedData.length || 0,
+                                                          updatedData.breadth || 0,
+                                                          updatedData.pieces || 0,
+                                                          updatedData.runningLength || 0,
+                                                          amountPerSqFt,
+                                                          updatedData.measurements,
+                                                          updatedData.runningMeasurements
+                                                        );
+                                                        setEditingItemData({ ...updatedData, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 });
+                                                      }
                                                       updateItemTotal(item.id, { measurements: newMeasurements, amountPerSqFt: item.amountPerSqFt });
                                                     }}
                                                     className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
@@ -1303,7 +1359,21 @@ export default function InteriorEstimatePage() {
                                                     type="button"
                                                     onClick={() => {
                                                       const newMeasurements = editingItemData.measurements?.filter(m => m.id !== measurement.id) || [];
-                                                      setEditingItemData(prev => prev ? { ...prev, measurements: newMeasurements } : null);
+                                                      const updatedData = editingItemData ? { ...editingItemData, measurements: newMeasurements } : null;
+                                                      if (updatedData) {
+                                                        const amountPerSqFt = updatedData.amountPerSqFt || item.amountPerSqFt || 0;
+                                                        const calculatedTotal = calculateTotalAmount(
+                                                          updatedData.type,
+                                                          updatedData.length || 0,
+                                                          updatedData.breadth || 0,
+                                                          updatedData.pieces || 0,
+                                                          updatedData.runningLength || 0,
+                                                          amountPerSqFt,
+                                                          updatedData.measurements,
+                                                          updatedData.runningMeasurements
+                                                        );
+                                                        setEditingItemData({ ...updatedData, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 });
+                                                      }
                                                       updateItemTotal(item.id, { measurements: newMeasurements, amountPerSqFt: item.amountPerSqFt });
                                                     }}
                                                     className="w-6 h-6 bg-red-500 text-white rounded flex items-center justify-center hover:bg-red-600 transition-colors"
@@ -1339,7 +1409,21 @@ export default function InteriorEstimatePage() {
                                             value={editingItemData?.breadth || item.breadth || 0}
                                             onChange={(e) => {
                                               const newBreadth = parseFloat(e.target.value) || 0;
-                                              setEditingItemData(prev => prev ? { ...prev, breadth: newBreadth } : null);
+                                              const updatedData = editingItemData ? { ...editingItemData, breadth: newBreadth } : null;
+                                              if (updatedData) {
+                                                const amountPerSqFt = updatedData.amountPerSqFt || item.amountPerSqFt || 0;
+                                                const calculatedTotal = calculateTotalAmount(
+                                                  updatedData.type,
+                                                  updatedData.length || 0,
+                                                  updatedData.breadth || 0,
+                                                  updatedData.pieces || 0,
+                                                  updatedData.runningLength || 0,
+                                                  amountPerSqFt,
+                                                  updatedData.measurements,
+                                                  updatedData.runningMeasurements
+                                                );
+                                                setEditingItemData({ ...updatedData, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 });
+                                              }
                                               updateItemTotal(item.id, { breadth: newBreadth, amountPerSqFt: item.amountPerSqFt });
                                             }}
                                             className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
@@ -1357,7 +1441,21 @@ export default function InteriorEstimatePage() {
                                                       const newMeasurements = editingItemData.measurements?.map(m => 
                                                         m.id === measurement.id ? { ...m, breadth: parseFloat(e.target.value) || 0 } : m
                                                       ) || [];
-                                                      setEditingItemData(prev => prev ? { ...prev, measurements: newMeasurements } : null);
+                                                      const updatedData = editingItemData ? { ...editingItemData, measurements: newMeasurements } : null;
+                                                      if (updatedData) {
+                                                        const amountPerSqFt = updatedData.amountPerSqFt || item.amountPerSqFt || 0;
+                                                        const calculatedTotal = calculateTotalAmount(
+                                                          updatedData.type,
+                                                          updatedData.length || 0,
+                                                          updatedData.breadth || 0,
+                                                          updatedData.pieces || 0,
+                                                          updatedData.runningLength || 0,
+                                                          amountPerSqFt,
+                                                          updatedData.measurements,
+                                                          updatedData.runningMeasurements
+                                                        );
+                                                        setEditingItemData({ ...updatedData, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 });
+                                                      }
                                                       updateItemTotal(item.id, { measurements: newMeasurements, amountPerSqFt: item.amountPerSqFt });
                                                     }}
                                                     className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
@@ -1420,7 +1518,21 @@ export default function InteriorEstimatePage() {
                                           value={editingItemData?.pieces || item.pieces || 0}
                                           onChange={(e) => {
                                             const newPieces = parseInt(e.target.value) || 0;
-                                            setEditingItemData(prev => prev ? { ...prev, pieces: newPieces } : null);
+                                            const updatedData = editingItemData ? { ...editingItemData, pieces: newPieces } : null;
+                                            if (updatedData) {
+                                              const amountPerSqFt = updatedData.amountPerSqFt || item.amountPerSqFt || 0;
+                                              const calculatedTotal = calculateTotalAmount(
+                                                updatedData.type,
+                                                updatedData.length || 0,
+                                                updatedData.breadth || 0,
+                                                updatedData.pieces || 0,
+                                                updatedData.runningLength || 0,
+                                                amountPerSqFt,
+                                                updatedData.measurements,
+                                                updatedData.runningMeasurements
+                                              );
+                                              setEditingItemData({ ...updatedData, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 });
+                                            }
                                             updateItemTotal(item.id, { pieces: newPieces, amountPerSqFt: item.amountPerSqFt });
                                           }}
                                           className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
@@ -1443,7 +1555,21 @@ export default function InteriorEstimatePage() {
                                               value={editingItemData?.runningLength || item.runningLength || 0}
                                               onChange={(e) => {
                                                 const newRunningLength = parseFloat(e.target.value) || 0;
-                                                setEditingItemData(prev => prev ? { ...prev, runningLength: newRunningLength } : null);
+                                                const updatedData = editingItemData ? { ...editingItemData, runningLength: newRunningLength } : null;
+                                                if (updatedData) {
+                                                  const amountPerSqFt = updatedData.amountPerSqFt || item.amountPerSqFt || 0;
+                                                  const calculatedTotal = calculateTotalAmount(
+                                                    updatedData.type,
+                                                    updatedData.length || 0,
+                                                    updatedData.breadth || 0,
+                                                    updatedData.pieces || 0,
+                                                    updatedData.runningLength || 0,
+                                                    amountPerSqFt,
+                                                    updatedData.measurements,
+                                                    updatedData.runningMeasurements
+                                                  );
+                                                  setEditingItemData({ ...updatedData, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 });
+                                                }
                                                 updateItemTotal(item.id, { runningLength: newRunningLength, amountPerSqFt: item.amountPerSqFt });
                                               }}
                                               className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
@@ -1462,7 +1588,21 @@ export default function InteriorEstimatePage() {
                                                       const newRunningMeasurements = editingItemData.runningMeasurements?.map(m => 
                                                         m.id === measurement.id ? { ...m, length: parseFloat(e.target.value) || 0 } : m
                                                       ) || [];
-                                                      setEditingItemData(prev => prev ? { ...prev, runningMeasurements: newRunningMeasurements } : null);
+                                                      const updatedData = editingItemData ? { ...editingItemData, runningMeasurements: newRunningMeasurements } : null;
+                                                      if (updatedData) {
+                                                        const amountPerSqFt = updatedData.amountPerSqFt || item.amountPerSqFt || 0;
+                                                        const calculatedTotal = calculateTotalAmount(
+                                                          updatedData.type,
+                                                          updatedData.length || 0,
+                                                          updatedData.breadth || 0,
+                                                          updatedData.pieces || 0,
+                                                          updatedData.runningLength || 0,
+                                                          amountPerSqFt,
+                                                          updatedData.measurements,
+                                                          updatedData.runningMeasurements
+                                                        );
+                                                        setEditingItemData({ ...updatedData, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 });
+                                                      }
                                                       updateItemTotal(item.id, { runningMeasurements: newRunningMeasurements, amountPerSqFt: item.amountPerSqFt });
                                                     }}
                                                     className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
@@ -1504,7 +1644,21 @@ export default function InteriorEstimatePage() {
                                                     type="button"
                                                     onClick={() => {
                                                       const newRunningMeasurements = editingItemData.runningMeasurements?.filter(m => m.id !== measurement.id) || [];
-                                                      setEditingItemData(prev => prev ? { ...prev, runningMeasurements: newRunningMeasurements } : null);
+                                                      const updatedData = editingItemData ? { ...editingItemData, runningMeasurements: newRunningMeasurements } : null;
+                                                      if (updatedData) {
+                                                        const amountPerSqFt = updatedData.amountPerSqFt || item.amountPerSqFt || 0;
+                                                        const calculatedTotal = calculateTotalAmount(
+                                                          updatedData.type,
+                                                          updatedData.length || 0,
+                                                          updatedData.breadth || 0,
+                                                          updatedData.pieces || 0,
+                                                          updatedData.runningLength || 0,
+                                                          amountPerSqFt,
+                                                          updatedData.measurements,
+                                                          updatedData.runningMeasurements
+                                                        );
+                                                        setEditingItemData({ ...updatedData, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 });
+                                                      }
                                                       updateItemTotal(item.id, { runningMeasurements: newRunningMeasurements, amountPerSqFt: item.amountPerSqFt });
                                                     }}
                                                     className="w-6 h-6 bg-red-500 text-white rounded flex items-center justify-center hover:bg-red-600 transition-colors"
@@ -1562,7 +1716,20 @@ export default function InteriorEstimatePage() {
                                       value={editingItemData?.amountPerSqFt || item.amountPerSqFt || 0}
                                       onChange={(e) => {
                                         const newAmount = parseFloat(e.target.value) || 0;
-                                        setEditingItemData(prev => prev ? { ...prev, amountPerSqFt: newAmount } : null);
+                                        const updatedData = editingItemData ? { ...editingItemData, amountPerSqFt: newAmount } : null;
+                                        if (updatedData) {
+                                          const calculatedTotal = calculateTotalAmount(
+                                            updatedData.type,
+                                            updatedData.length || 0,
+                                            updatedData.breadth || 0,
+                                            updatedData.pieces || 0,
+                                            updatedData.runningLength || 0,
+                                            newAmount,
+                                            updatedData.measurements,
+                                            updatedData.runningMeasurements
+                                          );
+                                          setEditingItemData({ ...updatedData, totalAmount: isFinite(calculatedTotal) ? calculatedTotal : 0 });
+                                        }
                                         updateItemTotal(item.id, { amountPerSqFt: newAmount });
                                       }}
                                       className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
@@ -1576,7 +1743,7 @@ export default function InteriorEstimatePage() {
                                 <td className="py-3 px-4 text-sm font-semibold text-green-600">
                                   <div className="text-center">
                                     ₹{(() => {
-                                      const amount = editingItemData?.totalAmount || item.totalAmount;
+                                      const amount = (editingItem?.id === item.id && editingItemData) ? editingItemData.totalAmount : item.totalAmount;
                                       return isFinite(amount) ? amount.toFixed(1) : '0.0';
                                     })()}
                                   </div>
