@@ -3,7 +3,7 @@ import dbConnect from '@/app/lib/db';
 import Client from '@/app/models/Client';
 
 interface InteriorEstimate {
-  clientId?: string | { toString: () => string };
+  clientId?: string | { toString: () => string } | unknown;
   status?: string;
 }
 
@@ -29,7 +29,10 @@ export async function GET() {
     const clientIds = new Set<string>();
     approvedEstimates.forEach((est) => {
       if (est.clientId) {
-        clientIds.add(est.clientId.toString());
+        const clientId = typeof est.clientId === 'string' 
+          ? est.clientId 
+          : String(est.clientId);
+        clientIds.add(clientId);
       }
     });
     
