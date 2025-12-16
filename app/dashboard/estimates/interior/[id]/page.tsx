@@ -1767,7 +1767,7 @@ We look forward to bringing your vision to life!
                                       {categoryItems.some(item => item.type === 'pieces') && (
                                         <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Pieces</th>
                                       )}
-                                      {categoryItems.some(item => item.type === 'running') && (
+                                      {categoryItems.some(item => item.type === 'running' || item.type === 'running_sq_feet') && (
                                         <>
                                           <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Running Length (cm)</th>
                                           <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200"></th>
@@ -2011,10 +2011,10 @@ We look forward to bringing your vision to life!
                                             )}
                                           </td>
                                         )}
-                                        {categoryItems.some(i => i.type === 'running') && (
+                                        {categoryItems.some(i => i.type === 'running' || i.type === 'running_sq_feet') && (
                                           <>
                                             <td className="py-3 px-4 text-sm text-gray-600">
-                                              {editingItem?.id === item.id && item.type === 'running' ? (
+                                              {editingItem?.id === item.id && (item.type === 'running' || item.type === 'running_sq_feet') ? (
                                                 <div className="space-y-2">
                                                   <div className="flex justify-center">
                                                     <input
@@ -2053,7 +2053,7 @@ We look forward to bringing your vision to life!
                                                   )}
                                                 </div>
                                               ) : (
-                                                item.type === 'running' ? (
+                                                (item.type === 'running' || item.type === 'running_sq_feet') ? (
                                                   item.runningMeasurements && item.runningMeasurements.length > 0 ? (
                                                     <div className="space-y-1">
                                                       <div className="text-center">{item.runningLength || 0}</div>
@@ -2070,7 +2070,7 @@ We look forward to bringing your vision to life!
                                               )}
                                             </td>
                                             <td className="py-3 px-4 text-sm text-gray-600">
-                                              {editingItem?.id === item.id && item.type === 'running' ? (
+                                              {editingItem?.id === item.id && (item.type === 'running' || item.type === 'running_sq_feet') ? (
                                                 <div className="space-y-2">
                                                   {/* Empty space for first row */}
                                                   <div className="h-8"></div>
@@ -2112,7 +2112,7 @@ We look forward to bringing your vision to life!
                                               )}
                                             </td>
                                             <td className="py-3 px-4 text-sm text-gray-600">
-                                              {editingItem?.id === item.id && item.type === 'running' ? (
+                                              {editingItem?.id === item.id && (item.type === 'running' || item.type === 'running_sq_feet') ? (
                                                 <div className="text-sm font-medium text-blue-600">
                                                   {(() => {
                                                     const singleFeet = cmToFeet(editingItemData?.runningLength || 0);
@@ -2122,7 +2122,7 @@ We look forward to bringing your vision to life!
                                                   })()} ft
                                                 </div>
                                               ) : (
-                                                item.type === 'running' ? (
+                                                (item.type === 'running' || item.type === 'running_sq_feet') ? (
                                                   (() => {
                                                     const singleFeet = cmToFeet(item.runningLength || 0);
                                                     const measurementsFeet = item.runningMeasurements ? calculateTotalRunningFeet(item.runningMeasurements) : 0;
@@ -2281,7 +2281,7 @@ We look forward to bringing your vision to life!
                                 {categoryItems.some(item => item.type === 'pieces') && (
                                   <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Pieces</th>
                                 )}
-                                {categoryItems.some(item => item.type === 'running') && (
+                                {categoryItems.some(item => item.type === 'running' || item.type === 'running_sq_feet') && (
                                   <>
                                     <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200">Running Length (cm)</th>
                                     <th className="text-left py-3 px-4 font-semibold text-gray-700 border-b border-gray-200"></th>
@@ -2364,10 +2364,10 @@ We look forward to bringing your vision to life!
                                     }
                                     </td>
                                   )}
-                                  {categoryItems.some(i => i.type === 'running') && (
+                                  {categoryItems.some(i => i.type === 'running' || i.type === 'running_sq_feet') && (
                                     <>
                                       <td className="py-3 px-4 text-sm text-gray-600">
-                                        {item.type === 'running' ? (
+                                        {(item.type === 'running' || item.type === 'running_sq_feet') ? (
                                           item.runningMeasurements && item.runningMeasurements.length > 0 ? (
                                             <div className="space-y-1">
                                               <div className="text-center">{item.runningLength || 0}</div>
@@ -2385,7 +2385,7 @@ We look forward to bringing your vision to life!
                                       </td>
                                       <td className="py-3 px-4 text-sm text-gray-600">-</td>
                                       <td className="py-3 px-4 text-sm text-gray-600">
-                                        {item.type === 'running' ? (
+                                        {(item.type === 'running' || item.type === 'running_sq_feet') ? (
                                           <div className="text-center">
                                             {(() => {
                                               const singleFeet = cmToFeet(item.runningLength || 0);
