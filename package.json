@@ -17,7 +17,7 @@
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.525.0",
     "mongoose": "^8.16.3",
-    "next": "15.3.5",
+    "next": "^15.5.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sweetalert2": "^11.22.2"
@@ -29,7 +29,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.3.5",
+    "eslint-config-next": "^15.5.7",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
