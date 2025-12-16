@@ -210,64 +210,150 @@ export default function GeneralEstimatePage() {
     // Now download PDF
     const doc = new jsPDF();
     const { subtotal, grandTotal } = calculateGrandTotal();
+    const currentDate = new Date();
 
-    // Header
-    doc.setFontSize(20);
-    doc.text(`${typeInfo.title}`, 14, 20);
+    // Add full page border
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.rect(5, 5, 200, 287);
     
-    doc.setFontSize(12);
-    doc.text(`Client: ${clientName}`, 14, 30);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 36);
+    // Add professional header background with gradient effect
+    doc.setFillColor(0, 51, 102); // Dark blue
+    doc.rect(5, 5, 200, 45, 'F');
+    doc.setFillColor(0, 71, 142); // Lighter blue for accent
+    doc.rect(5, 45, 200, 20, 'F');
     
-    if (estimateName) {
-      doc.text(`Estimate Name: ${estimateName}`, 14, 42);
+    // Add company details on left side with professional styling
+    doc.setFontSize(18);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Takshaga Spatial Solutions", 15, 20);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text("2nd Floor, Opp. Panchayat Building", 15, 30);
+    doc.text("Upputhara P.O, Idukki District", 15, 35);
+    doc.text("Kerala – 685505, India", 15, 40);
+
+    // Add logo on right side
+    const logoUrl = '/logo.png';
+    try {
+      doc.addImage(logoUrl, 'PNG', 155, 8, 50, 50);
+    } catch {
+      console.log('Logo not found, continuing without logo');
     }
+
+    // Add contact details in light blue area
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'normal');
+    doc.text("Website: www.takshaga.com", 105, 52, { align: 'center' });
+    doc.text("Email: info@takshaga.com", 105, 57, { align: 'center' });
+    doc.text("+91 98466 60624 | +91 95443 44332", 105, 62, { align: 'center' });
+    
+    // Add professional estimate details section
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(5, 75, 200, 45, 2, 2, 'F');
+    
+    // Add estimate details on left in a structured format
+    doc.setTextColor(0);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text("ESTIMATE DETAILS", 15, 85);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Estimate No: EST-${currentDate.getFullYear()}-${Date.now().toString().slice(-6).toUpperCase()}`, 15, 95);
+    doc.text(`Date: ${currentDate.toLocaleDateString()}`, 15, 105);
+    
+    // Add client details on right with better structure
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text("BILL TO", 110, 85);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(clientName || "", 110, 95);
+    
+    // Add ESTIMATE heading with professional styling
+    doc.setFillColor(0, 51, 102);
+    doc.rect(5, 130, 200, 12, 'F');
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text("ESTIMATE", 105, 138, { align: "center" });
+
+    let yPos = 150;
 
     // Table data
     const tableData = items.map(item => [
       item.particulars,
       item.sqFeet.toFixed(2),
-      `₹${item.amountPerSqFt.toFixed(2)}`,
-      `₹${item.totalAmount.toFixed(2)}`
+      `Rs ${item.amountPerSqFt.toFixed(2)}`,
+      `Rs ${item.totalAmount.toFixed(2)}`
     ]);
 
     // Add table
     autoTable(doc, {
+      startY: yPos,
       head: [['Particulars', 'Sq Feet', 'Amount per sq ft', 'Total']],
       body: tableData,
-      startY: estimateName ? 48 : 42,
-      theme: 'striped',
-      headStyles: { fillColor: [59, 130, 246] },
+      theme: 'grid',
+      headStyles: {
+        fillColor: [248, 250, 252],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold'
+      },
+      bodyStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0]
+      },
+      styles: { fontSize: 8, cellPadding: 2 },
+      margin: { left: 15, right: 15 },
       columnStyles: {
         0: { cellWidth: 90 },
-        1: { cellWidth: 25 },
+        1: { cellWidth: 35 },
         2: { cellWidth: 35 },
-        3: { cellWidth: 35 }
+        3: { cellWidth: 30 }
       }
     });
 
-    // Get final Y position after table
-    let finalY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+    yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
 
-    // Totals
-    finalY += 10;
-    doc.setFontSize(12);
-    doc.text(`Subtotal: ₹${subtotal.toFixed(2)}`, 150, finalY);
+    doc.setDrawColor(189, 195, 199);
+    doc.setLineWidth(0.5);
+    doc.line(20, yPos, 190, yPos);
+    yPos += 8;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(44, 62, 80);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Sub Total:`, 149, yPos);
+    doc.text(`Rs ${subtotal.toFixed(2)}`, 191, yPos, { align: 'right' });
     
     if (discount > 0) {
       const discountAmount = discountType === 'percentage' 
         ? (subtotal * discount / 100) 
         : discount;
-      finalY += 6;
-      doc.text(`Discount: -₹${discountAmount.toFixed(2)}`, 150, finalY);
+      yPos += 7;
+      doc.text(`Discount:`, 149, yPos);
+      doc.text(`- Rs ${discountAmount.toFixed(2)}`, 191, yPos, { align: 'right' });
     }
     
-    finalY += 6;
-    doc.setFontSize(14);
-    doc.text(`Grand Total: ₹${grandTotal.toFixed(2)}`, 150, finalY);
+    yPos += 7;
+    doc.setFontSize(12);
+    doc.text(`Grand Total:`, 135, yPos);
+    doc.text(`Rs ${grandTotal.toFixed(2)}`, 191, yPos, { align: 'right' });
 
-    // Save PDF
-    doc.save(`${typeInfo.shortTitle}_Estimate_${clientName}_${new Date().toISOString().split('T')[0]}.pdf`);
+    yPos += 15;
+    doc.setFillColor(0, 51, 102);
+    doc.rect(5, yPos, 200, 15, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'normal');
+    doc.text("This is a computer generated document and does not require a signature.", 105, yPos + 11, { align: "center" });
+
+    // Save PDF with formatted filename: General_Estimate_chris_2025-12-16.pdf
+    const formattedDate = currentDate.toISOString().split('T')[0];
+    const formattedClientName = (clientName || 'client').replace(/\s+/g, '_');
+    doc.save(`General_Estimate_${formattedClientName}_${formattedDate}.pdf`);
   };
 
   const handleBackToEstimates = () => {

@@ -302,8 +302,10 @@ export default function GeneralEstimateViewPage() {
     doc.setFont('helvetica', 'normal');
     doc.text("This is a computer generated document and does not require a signature.", 105, yPos + 11, { align: "center" });
 
-    // Save PDF
-    doc.save(`${estimate.estimateName || 'Estimate'}_${new Date().toISOString().split('T')[0]}.pdf`);
+    // Save PDF with formatted filename: General_Estimate_chris_2025-12-16.pdf
+    const formattedDate = new Date(estimate.createdAt).toISOString().split('T')[0];
+    const formattedClientName = (clientDetails.name || 'client').replace(/\s+/g, '_');
+    doc.save(`General_Estimate_${formattedClientName}_${formattedDate}.pdf`);
   };
 
   const handleBack = () => {
