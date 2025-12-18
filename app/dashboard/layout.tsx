@@ -165,7 +165,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           alt="Takshaga Logo"
           width={96}
           height={106}
-          className="mx-auto my-8 rounded-2xl shadow-lg"
+          className="mx-auto my-8 shadow-lg"
         />
         <div className="border-b border-gray-200 w-full my-4"></div>
         {/* Navigation */}
