@@ -24,6 +24,7 @@ import type { SweetAlertOptions } from 'sweetalert2';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
+import { formatDateDDMMYYYY, formatDateForFileName } from '@/app/utils/dateFormat';
 
 interface Stage {
   _id: string;
@@ -254,7 +255,7 @@ export default function ApprovedWorkDetailsPage() {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Invoice No: INV-${new Date().getFullYear()}-${String(income._id).slice(-6).toUpperCase()}`, 15, 95);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 15, 105);
+      doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 15, 105);
       doc.text(`Payment Phase: Phase ${interiorIncomes.indexOf(income) + 1}`, 15, 115);
       
       doc.setFontSize(11);
@@ -382,7 +383,7 @@ export default function ApprovedWorkDetailsPage() {
       doc.setTextColor(100, 100, 100);
       doc.text('This is a computer generated bill, no signature required.', 105, 285, { align: 'center' });
       
-      const fileName = `Invoice_Phase_${interiorIncomes.indexOf(income) + 1}_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
+      const fileName = `Invoice_Phase_${interiorIncomes.indexOf(income) + 1}_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${formatDateForFileName(new Date())}.pdf`;
       doc.save(fileName);
 
       Swal.fire({
@@ -458,7 +459,7 @@ export default function ApprovedWorkDetailsPage() {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Receipt No: RCP-${new Date().getFullYear()}-${String(income._id).slice(-6).toUpperCase()}`, 15, 95);
-      doc.text(`Date: ${new Date(income.date).toLocaleDateString()}`, 15, 105);
+      doc.text(`Date: ${formatDateDDMMYYYY(income.date)}`, 15, 105);
       doc.text(`Payment Phase: Phase ${interiorIncomes.indexOf(income) + 1}`, 15, 115);
       
       doc.setFontSize(11);
@@ -581,7 +582,7 @@ export default function ApprovedWorkDetailsPage() {
       doc.setTextColor(100, 100, 100);
       doc.text('This is a computer generated receipt, no signature required.', 105, 285, { align: 'center' });
       
-      const fileName = `Receipt_Phase_${phaseNumber}_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
+      const fileName = `Receipt_Phase_${phaseNumber}_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${formatDateForFileName(new Date())}.pdf`;
       doc.save(fileName);
 
       Swal.fire({
@@ -669,7 +670,7 @@ export default function ApprovedWorkDetailsPage() {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Receipt No: RCP-ALL-${new Date().getFullYear()}-${String(estimate?._id || '').slice(-6).toUpperCase()}`, 15, 95);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 15, 105);
+      doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 15, 105);
       doc.text(`Total Payments: ${completedPayments.length}`, 15, 115);
       
       doc.setFontSize(11);
@@ -761,7 +762,7 @@ export default function ApprovedWorkDetailsPage() {
       doc.setTextColor(100, 100, 100);
       doc.text('This is a computer generated receipt, no signature required.', 105, 285, { align: 'center' });
       
-      const fileName = `Receipt_All_Payments_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
+      const fileName = `Receipt_All_Payments_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${formatDateForFileName(new Date())}.pdf`;
       doc.save(fileName);
 
       Swal.fire({
@@ -1437,12 +1438,12 @@ export default function ApprovedWorkDetailsPage() {
                 
                 <div>
                   <span className="text-sm font-medium text-gray-600">Created Date:</span>
-                  <p className="text-gray-900">{new Date(estimate.createdAt).toLocaleDateString()}</p>
+                  <p className="text-gray-900">{formatDateDDMMYYYY(estimate.createdAt)}</p>
                 </div>
                 
                 <div>
                   <span className="text-sm font-medium text-gray-600">Last Updated:</span>
-                  <p className="text-gray-900">{new Date(estimate.updatedAt).toLocaleDateString()}</p>
+                  <p className="text-gray-900">{formatDateDDMMYYYY(estimate.updatedAt)}</p>
                 </div>
               </div>
             </div>
@@ -1844,11 +1845,7 @@ export default function ApprovedWorkDetailsPage() {
                             </span>
                           </div>
                           <p className="text-sm text-gray-600">
-                            {new Date(stage.date).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
+                            {formatDateDDMMYYYY(stage.date)}
                           </p>
                         </div>
                       </div>
@@ -2000,7 +1997,7 @@ export default function ApprovedWorkDetailsPage() {
                     </div>
 
                     <div className="text-sm text-gray-600 mb-3 space-y-1">
-                      <p>Date: {new Date(income.date).toLocaleDateString()}</p>
+                      <p>Date: {formatDateDDMMYYYY(income.date)}</p>
                       {income.method && <p>Payment Method: <span className="font-medium">{income.method}</span></p>}
                       {income.markedBy && <p>Marked by: <span className="font-medium text-blue-600">{income.markedBy.split('@')[0]}</span></p>}
                     </div>
@@ -2109,7 +2106,7 @@ export default function ApprovedWorkDetailsPage() {
                                 <span className="text-lg font-bold text-gray-900">₹{expense.amount.toLocaleString()}</span>
                               </div>
                               <div className="flex items-center justify-between text-sm text-gray-600">
-                                <span>Date: {new Date(expense.date).toLocaleDateString()}</span>
+                                <span>Date: {formatDateDDMMYYYY(expense.date)}</span>
                                 <span>Added by: {expense.addedBy}</span>
                               </div>
                             </div>

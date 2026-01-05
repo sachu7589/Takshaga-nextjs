@@ -14,6 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatDateDDMMYYYY } from '@/app/utils/dateFormat';
 
 interface EstimateItem {
   id: string;
@@ -262,7 +263,7 @@ export default function GeneralEstimatePage() {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(`Estimate No: EST-${currentDate.getFullYear()}-${Date.now().toString().slice(-6).toUpperCase()}`, 15, 95);
-    doc.text(`Date: ${currentDate.toLocaleDateString()}`, 15, 105);
+    doc.text(`Date: ${formatDateDDMMYYYY(currentDate)}`, 15, 105);
     
     // Add client details on right with better structure
     doc.setFontSize(11);

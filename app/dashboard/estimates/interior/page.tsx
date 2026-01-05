@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Swal from 'sweetalert2';
+import { formatDateDDMMYYYY } from '@/app/utils/dateFormat';
 
 interface Measurement {
   id: string;
@@ -2170,7 +2171,7 @@ export default function InteriorEstimatePage() {
                         </span>
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
-                        {new Date(estimate.createdAt).toLocaleDateString()}
+                        {formatDateDDMMYYYY(estimate.createdAt)}
                       </div>
                     </button>
                   ))

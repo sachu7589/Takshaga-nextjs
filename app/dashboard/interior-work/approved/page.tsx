@@ -18,6 +18,7 @@ import {
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatDateDDMMYYYY, formatDateForFileName } from '@/app/utils/dateFormat';
 
 interface Item {
   id: string;
@@ -175,7 +176,7 @@ export default function ApprovedWorksPage() {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Estimate No: EST-${new Date(work.createdAt).getFullYear()}-${String(work._id).slice(-6).toUpperCase()}`, 15, 95);
-      doc.text(`Date: ${new Date(work.createdAt).toLocaleDateString()}`, 15, 105);
+      doc.text(`Date: ${formatDateDDMMYYYY(work.createdAt)}`, 15, 105);
       
       // Add client details on right with better structure
       doc.setFontSize(11);
@@ -733,7 +734,7 @@ We look forward to bringing your vision to life!
                       <span className="text-sm font-medium text-green-700">Approved</span>
                     </div>
                     <div className="text-xs text-gray-500">
-                      {new Date(work.createdAt).toLocaleDateString()}
+                      {formatDateDDMMYYYY(work.createdAt)}
                     </div>
                   </div>
                   

@@ -17,6 +17,7 @@ import {
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatDateDDMMYYYY } from '@/app/utils/dateFormat';
 
 interface Category {
   id: string;
@@ -571,7 +572,7 @@ export default function InteriorEstimateDetailsPage() {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Estimate No: EST-${new Date(estimate.createdAt).getFullYear()}-${String(estimate._id).slice(-6).toUpperCase()}`, 15, 95);
-      doc.text(`Date: ${new Date(estimate.createdAt).toLocaleDateString()}`, 15, 105);
+      doc.text(`Date: ${formatDateDDMMYYYY(estimate.createdAt)}`, 15, 105);
       
       // Add client details on right with better structure
       doc.setFontSize(11);
@@ -1520,7 +1521,7 @@ We look forward to bringing your vision to life!
                 </div>
                 <div>
                   <span className="font-medium text-blue-700">Created:</span>
-                  <p className="text-blue-900">{new Date(estimate.createdAt).toLocaleDateString()}</p>
+                  <p className="text-blue-900">{formatDateDDMMYYYY(estimate.createdAt)}</p>
                 </div>
                 <div>
                   <span className="font-medium text-blue-700">Status:</span>

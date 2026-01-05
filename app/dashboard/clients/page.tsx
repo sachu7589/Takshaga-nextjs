@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Swal from 'sweetalert2';
+import { formatDateDDMMYYYY } from '@/app/utils/dateFormat';
 import { 
   Users, 
   Plus, 
@@ -464,7 +465,7 @@ export default function ClientsPage() {
               {/* Date */}
               <div className="mb-4">
                 <span className="text-xs text-gray-500">
-                  {new Date(client.createdAt).toLocaleDateString()}
+                  {formatDateDDMMYYYY(client.createdAt)}
                 </span>
               </div>
 

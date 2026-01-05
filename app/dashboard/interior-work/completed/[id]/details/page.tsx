@@ -18,6 +18,7 @@ import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
+import { formatDateDDMMYYYY, formatDateForFileName } from '@/app/utils/dateFormat';
 
 interface Item {
   id: string;
@@ -246,7 +247,7 @@ export default function CompletedWorkDetailsPage() {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Estimate No: EST-${new Date(estimate.createdAt).getFullYear()}-${String(estimate._id).slice(-6).toUpperCase()}`, 15, 95);
-      doc.text(`Date: ${new Date(estimate.createdAt).toLocaleDateString()}`, 15, 105);
+      doc.text(`Date: ${formatDateDDMMYYYY(estimate.createdAt)}`, 15, 105);
       
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
@@ -415,7 +416,7 @@ export default function CompletedWorkDetailsPage() {
         margin: { left: 10, right: 10 }
       });
 
-      const fileName = `Completed_Estimate_${estimate.client.name.replace(/\s+/g, '_')}_${new Date(estimate.createdAt).toLocaleDateString().replace(/\//g, '-')}.pdf`;
+      const fileName = `Completed_Estimate_${estimate.client.name.replace(/\s+/g, '_')}_${formatDateForFileName(estimate.createdAt)}.pdf`;
       doc.save(fileName);
 
       Swal.fire({
@@ -504,7 +505,7 @@ export default function CompletedWorkDetailsPage() {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Receipt No: RCP-ALL-${new Date().getFullYear()}-${String(estimate?._id || '').slice(-6).toUpperCase()}`, 15, 95);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 15, 105);
+      doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 15, 105);
       doc.text(`Total Payments: ${completedPayments.length}`, 15, 115);
       
       doc.setFontSize(11);
@@ -596,7 +597,7 @@ export default function CompletedWorkDetailsPage() {
       doc.setTextColor(100, 100, 100);
       doc.text('This is a computer generated receipt, no signature required.', 105, 285, { align: 'center' });
       
-      const fileName = `Receipt_All_Payments_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
+      const fileName = `Receipt_All_Payments_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${formatDateForFileName(new Date())}.pdf`;
       doc.save(fileName);
 
       Swal.fire({
@@ -672,7 +673,7 @@ export default function CompletedWorkDetailsPage() {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Receipt No: RCP-${new Date().getFullYear()}-${String(income._id).slice(-6).toUpperCase()}`, 15, 95);
-      doc.text(`Date: ${new Date(income.date).toLocaleDateString()}`, 15, 105);
+      doc.text(`Date: ${formatDateDDMMYYYY(income.date)}`, 15, 105);
       doc.text(`Payment Phase: Phase ${interiorIncomes.indexOf(income) + 1}`, 15, 115);
       
       doc.setFontSize(11);
@@ -797,7 +798,7 @@ export default function CompletedWorkDetailsPage() {
       doc.setTextColor(100, 100, 100);
       doc.text('This is a computer generated receipt, no signature required.', 105, 285, { align: 'center' });
       
-      const fileName = `Receipt_Phase_${phaseNumber}_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
+      const fileName = `Receipt_Phase_${phaseNumber}_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${formatDateForFileName(new Date())}.pdf`;
       doc.save(fileName);
 
       Swal.fire({
@@ -937,7 +938,7 @@ export default function CompletedWorkDetailsPage() {
 
         const paymentData = completedPayments.map((income, index) => [
           `Phase ${interiorIncomes.indexOf(income) + 1}`,
-          new Date(income.date).toLocaleDateString(),
+          formatDateDDMMYYYY(income.date),
           `Rs. ${income.amount.toLocaleString()}`,
           income.method ? income.method.charAt(0).toUpperCase() + income.method.slice(1) : 'N/A'
         ]);
@@ -1004,7 +1005,7 @@ export default function CompletedWorkDetailsPage() {
         const stagesData = stages.map((stage, index) => [
           index + 1,
           stage.stageDesc,
-          new Date(stage.date).toLocaleDateString()
+          formatDateDDMMYYYY(stage.date)
         ]);
 
         autoTable(doc, {
@@ -1040,7 +1041,7 @@ export default function CompletedWorkDetailsPage() {
       doc.setTextColor(0);
       doc.text('This report is generated for client reference.', 105, 280, { align: 'center' });
 
-      const fileName = `Client_Report_${estimate.client.name.replace(/\s+/g, '_')}_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
+      const fileName = `Client_Report_${estimate.client.name.replace(/\s+/g, '_')}_${formatDateForFileName(new Date())}.pdf`;
       doc.save(fileName);
 
       Swal.fire({
@@ -1204,7 +1205,7 @@ export default function CompletedWorkDetailsPage() {
 
         const paymentData = interiorIncomes.map((income, index) => [
           `Phase ${index + 1}`,
-          new Date(income.date).toLocaleDateString(),
+          formatDateDDMMYYYY(income.date),
           `Rs. ${income.amount.toLocaleString()}`,
           income.status === 'completed' ? 'Completed' : 'Pending',
           income.method ? income.method.charAt(0).toUpperCase() + income.method.slice(1) : 'N/A',
@@ -1256,9 +1257,9 @@ export default function CompletedWorkDetailsPage() {
         const otherExpenses = expenses.filter(e => e.category === 'other');
 
         const expensesData = [
-          ...materialExpenses.map(exp => ['Material', exp.notes || 'No notes', new Date(exp.date).toLocaleDateString(), `Rs. ${exp.amount.toLocaleString()}`, exp.addedBy]),
-          ...labourExpenses.map(exp => ['Labour', exp.notes || 'No notes', new Date(exp.date).toLocaleDateString(), `Rs. ${exp.amount.toLocaleString()}`, exp.addedBy]),
-          ...otherExpenses.map(exp => ['Other', exp.notes || 'No notes', new Date(exp.date).toLocaleDateString(), `Rs. ${exp.amount.toLocaleString()}`, exp.addedBy])
+          ...materialExpenses.map(exp => ['Material', exp.notes || 'No notes', formatDateDDMMYYYY(exp.date), `Rs. ${exp.amount.toLocaleString()}`, exp.addedBy]),
+          ...labourExpenses.map(exp => ['Labour', exp.notes || 'No notes', formatDateDDMMYYYY(exp.date), `Rs. ${exp.amount.toLocaleString()}`, exp.addedBy]),
+          ...otherExpenses.map(exp => ['Other', exp.notes || 'No notes', formatDateDDMMYYYY(exp.date), `Rs. ${exp.amount.toLocaleString()}`, exp.addedBy])
         ];
 
         autoTable(doc, {
@@ -1329,7 +1330,7 @@ export default function CompletedWorkDetailsPage() {
         const stagesData = stages.map((stage, index) => [
           index + 1,
           stage.stageDesc,
-          new Date(stage.date).toLocaleDateString()
+          formatDateDDMMYYYY(stage.date)
         ]);
 
         autoTable(doc, {
@@ -1369,7 +1370,7 @@ export default function CompletedWorkDetailsPage() {
       doc.setTextColor(100, 100, 100);
       doc.text('This report contains sensitive financial information and should not be shared with clients.', 105, 280, { align: 'center' });
 
-      const fileName = `Office_Report_${estimate.client.name.replace(/\s+/g, '_')}_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
+      const fileName = `Office_Report_${estimate.client.name.replace(/\s+/g, '_')}_${formatDateForFileName(new Date())}.pdf`;
       doc.save(fileName);
 
       Swal.fire({
@@ -1736,18 +1737,11 @@ export default function CompletedWorkDetailsPage() {
                       <div className="flex items-center space-x-4 text-sm text-gray-600">
                         <div className="flex items-center space-x-1">
                           <Calendar className="h-4 w-4" />
-                          <span>{new Date(stage.date).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
-                          })}</span>
+                          <span>{formatDateDDMMYYYY(stage.date)}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <Clock className="h-4 w-4" />
-                          <span>{new Date(stage.date).toLocaleTimeString('en-US', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}</span>
+                          <span>{formatDateDDMMYYYY(stage.date)}</span>
                         </div>
                       </div>
                     </div>
@@ -1832,11 +1826,7 @@ export default function CompletedWorkDetailsPage() {
                     <div className="bg-white rounded-lg p-4 border border-gray-100">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-600">Date</span>
-                        <span className="text-sm font-semibold text-gray-900">{new Date(income.date).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })}</span>
+                        <span className="text-sm font-semibold text-gray-900">{formatDateDDMMYYYY(income.date)}</span>
                       </div>
                     </div>
                   </div>
@@ -1945,11 +1935,7 @@ export default function CompletedWorkDetailsPage() {
                               <div className="flex items-center space-x-4 text-sm text-gray-600">
                                 <div className="flex items-center space-x-1">
                                   <Calendar className="h-4 w-4" />
-                                  <span>{new Date(expense.date).toLocaleDateString('en-US', { 
-                                    year: 'numeric', 
-                                    month: 'short', 
-                                    day: 'numeric' 
-                                  })}</span>
+                                  <span>{formatDateDDMMYYYY(expense.date)}</span>
                                 </div>
                                 <div className="flex items-center space-x-1">
                                   <User className="h-4 w-4" />

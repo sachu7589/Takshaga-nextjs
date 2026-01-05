@@ -280,7 +280,13 @@ View full estimate: ${window.location.href}`;
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Created Date</p>
-                <p className="text-lg font-bold text-gray-900">{new Date(estimate.createdAt).toLocaleDateString()}</p>
+                <p className="text-lg font-bold text-gray-900">{(() => {
+                  const date = new Date(estimate.createdAt);
+                  const day = String(date.getDate()).padStart(2, '0');
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const year = date.getFullYear();
+                  return `${day}/${month}/${year}`;
+                })()}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
                 <Calendar className="w-6 h-6 text-green-600" />

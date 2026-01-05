@@ -8,6 +8,7 @@ import {
   CheckCircle
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { formatDateDDMMYYYY } from '@/app/utils/dateFormat';
 
 interface EstimateType {
   id: string;
@@ -274,7 +275,7 @@ export default function EstimatesPage() {
                     <Home className="h-5 w-5 text-purple-600" />
                   </div>
                   <div className="text-xs text-gray-500">
-                    {estimate.createdAt ? new Date(estimate.createdAt).toLocaleDateString() : 'N/A'}
+                    {estimate.createdAt ? formatDateDDMMYYYY(estimate.createdAt) : 'N/A'}
                   </div>
                 </div>
                 
@@ -308,7 +309,7 @@ export default function EstimatesPage() {
                     ₹{Math.round(estimate.totalAmount).toLocaleString()}
                   </div>
                   <div className="text-xs text-gray-500">
-                    Updated {estimate.updatedAt ? new Date(estimate.updatedAt).toLocaleDateString() : 'N/A'}
+                    Updated {estimate.updatedAt ? formatDateDDMMYYYY(estimate.updatedAt) : 'N/A'}
                   </div>
                 </div>
               </div>
@@ -328,7 +329,7 @@ export default function EstimatesPage() {
                     <FileText className="h-5 w-5 text-blue-600" />
                   </div>
                   <div className="text-xs text-gray-500">
-                    {estimate.createdAt ? new Date(estimate.createdAt).toLocaleDateString() : 'N/A'}
+                    {estimate.createdAt ? formatDateDDMMYYYY(estimate.createdAt) : 'N/A'}
                   </div>
                 </div>
                 
@@ -357,7 +358,7 @@ export default function EstimatesPage() {
                     ₹{Math.round(estimate.totalAmount).toLocaleString()}
                   </div>
                   <div className="text-xs text-gray-500">
-                    Updated {estimate.updatedAt ? new Date(estimate.updatedAt).toLocaleDateString() : 'N/A'}
+                    Updated {estimate.updatedAt ? formatDateDDMMYYYY(estimate.updatedAt) : 'N/A'}
                   </div>
                 </div>
               </div>

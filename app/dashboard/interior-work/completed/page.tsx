@@ -175,7 +175,7 @@ export default function CompletedWorksPage() {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Estimate No: EST-${new Date(work.createdAt).getFullYear()}-${String(work._id).slice(-6).toUpperCase()}`, 15, 95);
-      doc.text(`Date: ${new Date(work.createdAt).toLocaleDateString()}`, 15, 105);
+      doc.text(`Date: ${formatDateDDMMYYYY(work.createdAt)}`, 15, 105);
       
       // Add client details on right with better structure
       doc.setFontSize(11);
@@ -356,7 +356,7 @@ export default function CompletedWorksPage() {
       });
 
       // Save the PDF
-      const fileName = `Estimate_${work.client.name.replace(/\s+/g, '_')}_${new Date(work.createdAt).toLocaleDateString().replace(/\//g, '-')}.pdf`;
+      const fileName = `Estimate_${work.client.name.replace(/\s+/g, '_')}_${formatDateForFileName(work.createdAt)}.pdf`;
       doc.save(fileName);
 
       Swal.fire({
@@ -536,7 +536,7 @@ export default function CompletedWorksPage() {
                       <span className="text-sm font-medium text-green-700">Completed</span>
                     </div>
                     <div className="text-xs text-gray-500">
-                      {new Date(work.createdAt).toLocaleDateString()}
+                      {formatDateDDMMYYYY(work.createdAt)}
                     </div>
                   </div>
                   
