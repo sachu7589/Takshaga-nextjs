@@ -22,6 +22,8 @@ import {
 import Swal from 'sweetalert2';
 import type { SweetAlertOptions } from 'sweetalert2';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import QRCode from 'qrcode';
 
 interface Stage {
   _id: string;
@@ -199,54 +201,586 @@ export default function ApprovedWorkDetailsPage() {
       return;
     }
 
-    const doc = new jsPDF();
-    
-    // Header
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('INVOICE', 105, 20, { align: 'center' });
-    
-    // Company Info
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Takshaga Interior Solutions', 20, 40);
-    doc.text('Interior Design & Construction', 20, 50);
-    doc.text('Phone: +91 1234567890', 20, 60);
-    doc.text('Email: info@takshaga.com', 20, 70);
-    
-    // Bank Details
-    doc.text('Bank Details:', 20, 90);
-    doc.text(`Bank: ${selectedBank.bankName}`, 20, 100);
-    doc.text(`Account: ${selectedBank.accountName}`, 20, 110);
-    doc.text(`A/C No: ${selectedBank.accountNumber}`, 20, 120);
-    doc.text(`IFSC: ${selectedBank.ifscCode}`, 20, 130);
-    doc.text(`UPI: ${selectedBank.upiId}`, 20, 140);
-    
-    // Client Info
-    doc.text('Bill To:', 120, 90);
-    if (estimate?.client) {
-      doc.text(estimate.client.name, 120, 100);
-      doc.text(estimate.client.email, 120, 110);
-      doc.text(estimate.client.phone, 120, 120);
-      doc.text(estimate.client.location, 120, 130);
+    try {
+      const doc = new jsPDF();
+      
+      // Add full page border - only 4 sides
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+      doc.rect(5, 5, 200, 287);
+      
+      // Add professional header background with gradient effect
+      doc.setFillColor(0, 51, 102); // Dark blue
+      doc.rect(5, 5, 200, 45, 'F');
+      doc.setFillColor(0, 71, 142); // Lighter blue for accent
+      doc.rect(5, 45, 200, 20, 'F');
+      
+      // Add company details on left side with professional styling
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Takshaga Spatial Solutions", 15, 20);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text("2nd Floor, Opp. Panchayat Building", 15, 30);
+      doc.text("Upputhara P.O, Idukki District", 15, 35);
+      doc.text("Kerala – 685505, India", 15, 40);
+
+      // Add logo on right side
+      const logoUrl = '/logo.png';
+      try {
+        doc.addImage(logoUrl, 'PNG', 155, 8, 50, 50);
+      } catch {
+        console.log('Logo not found, continuing without logo');
+      }
+
+      // Add contact details in light blue area
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Website: www.takshaga.com", 105, 52, { align: 'center' });
+      doc.text("Email: info@takshaga.com", 105, 57, { align: 'center' });
+      doc.text("+91 98466 60624 | +91 95443 44332", 105, 62, { align: 'center' });
+      
+      // Add professional invoice details section
+      doc.setFillColor(245, 245, 245);
+      doc.roundedRect(5, 75, 200, 45, 2, 2, 'F');
+      
+      // Add invoice details on left in a structured format
+      doc.setTextColor(0);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("INVOICE DETAILS", 15, 85);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Invoice No: INV-${new Date().getFullYear()}-${String(income._id).slice(-6).toUpperCase()}`, 15, 95);
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 15, 105);
+      doc.text(`Payment Phase: Phase ${interiorIncomes.indexOf(income) + 1}`, 15, 115);
+      
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("BILL TO", 110, 85);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      if (estimate?.client) {
+        doc.text(estimate.client.name, 110, 95);
+        doc.text(estimate.client.location || "", 110, 105);
+        doc.text(estimate.client.phone || "", 110, 115);
+      }
+      
+      // INVOICE heading
+      doc.setFillColor(0, 51, 102);
+      doc.rect(5, 130, 200, 12, 'F');
+      doc.setFontSize(14);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text("INVOICE", 105, 138, { align: "center" });
+
+      // Payment Details Table
+      let yPos = 150;
+      const phaseNumber = interiorIncomes.indexOf(income) + 1;
+
+      // Create professional table for payment details
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Description', 'Amount']],
+        body: [
+          [`Phase ${phaseNumber} Payment`, `Rs. ${income.amount.toLocaleString()}`],
+          ['Total Amount', `Rs. ${income.amount.toLocaleString()}`]
+        ],
+        theme: 'grid',
+        headStyles: {
+          fillColor: [0, 51, 102],
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 10
+        },
+        bodyStyles: {
+          fontSize: 10,
+          textColor: 0
+        },
+        columnStyles: {
+          0: { cellWidth: 100, fontStyle: 'bold' },
+          1: { cellWidth: 90, halign: 'right' }
+        },
+        margin: { left: 10, right: 10 }
+      });
+
+      yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
+
+      // Bank Details and QR Code Section (side by side) - ensure single page
+      const pageWidth = 210;
+      const rightMargin = 15;
+
+      // Bank Details on the left
+      doc.setFillColor(240, 240, 240);
+      doc.rect(5, yPos, 95, 8, 'F');
+      doc.setFontSize(10);
+      doc.setTextColor(0, 51, 102);
+      doc.setFont('helvetica', 'bold');
+      doc.text("BANK DETAILS", 10, yPos + 5);
+      
+      const bankYPos = yPos + 10;
+      const bankData = [
+        ['Bank Name', selectedBank.bankName],
+        ['Account Name', selectedBank.accountName],
+        ['Account Number', selectedBank.accountNumber],
+        ['IFSC Code', selectedBank.ifscCode],
+        ['UPI ID', selectedBank.upiId]
+      ];
+
+      autoTable(doc, {
+        startY: bankYPos,
+        body: bankData,
+        theme: 'grid',
+        bodyStyles: {
+          fontSize: 7,
+          textColor: 0
+        },
+        columnStyles: {
+          0: { cellWidth: 38, fontStyle: 'bold' },
+          1: { cellWidth: 52 }
+        },
+        margin: { left: 10, right: 5 },
+        tableWidth: 90
+      });
+
+      // QR Code on the right
+      try {
+        const upiId = selectedBank.upiId || '';
+        const amount = income.amount.toFixed(2);
+        const transactionNote = `Invoice Payment - Phase ${phaseNumber}`;
+        const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+        
+        const qrCodeDataUrl = await QRCode.toDataURL(upiLink, {
+          width: 40,
+          margin: 1
+        });
+        
+        // Add QR code on the right side
+        const qrSize = 40;
+        const qrX = pageWidth - rightMargin - qrSize;
+        const qrY = yPos + 5;
+        doc.addImage(qrCodeDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+      } catch (error) {
+        console.error('Error generating QR code:', error);
+      }
+
+      // Footer - position below bank details and QR code
+      const bankTableFinalY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+      const qrBottomY = yPos + 5 + 40; // QR code bottom position
+      const footerY = Math.max(bankTableFinalY, qrBottomY) + 10;
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0);
+      doc.text('Thank you for your business!', 105, footerY, { align: 'center' });
+      
+      // Computer generated bill notice at the bottom
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(100, 100, 100);
+      doc.text('This is a computer generated bill, no signature required.', 105, 285, { align: 'center' });
+      
+      const fileName = `Invoice_Phase_${interiorIncomes.indexOf(income) + 1}_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
+      doc.save(fileName);
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Invoice Downloaded',
+        text: 'Your invoice has been downloaded successfully.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Download Failed',
+        text: 'Failed to generate invoice PDF.',
+      });
     }
+  };
+
+  const handleDownloadReceipt = async (income: InteriorIncome, paymentMethod: string) => {
+    try {
+      const doc = new jsPDF();
+      
+      // Add full page border - only 4 sides
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+      doc.rect(5, 5, 200, 287);
+      
+      // Add professional header background with gradient effect
+      doc.setFillColor(0, 51, 102); // Dark blue
+      doc.rect(5, 5, 200, 45, 'F');
+      doc.setFillColor(0, 71, 142); // Lighter blue for accent
+      doc.rect(5, 45, 200, 20, 'F');
+      
+      // Add company details on left side with professional styling
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Takshaga Spatial Solutions", 15, 20);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text("2nd Floor, Opp. Panchayat Building", 15, 30);
+      doc.text("Upputhara P.O, Idukki District", 15, 35);
+      doc.text("Kerala – 685505, India", 15, 40);
+
+      // Add logo on right side
+      const logoUrl = '/logo.png';
+      try {
+        doc.addImage(logoUrl, 'PNG', 155, 8, 50, 50);
+      } catch {
+        console.log('Logo not found, continuing without logo');
+      }
+
+      // Add contact details in light blue area
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Website: www.takshaga.com", 105, 52, { align: 'center' });
+      doc.text("Email: info@takshaga.com", 105, 57, { align: 'center' });
+      doc.text("+91 98466 60624 | +91 95443 44332", 105, 62, { align: 'center' });
+      
+      // Add professional receipt details section
+      doc.setFillColor(245, 245, 245);
+      doc.roundedRect(5, 75, 200, 45, 2, 2, 'F');
+      
+      // Add receipt details on left in a structured format
+      doc.setTextColor(0);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("RECEIPT DETAILS", 15, 85);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Receipt No: RCP-${new Date().getFullYear()}-${String(income._id).slice(-6).toUpperCase()}`, 15, 95);
+      doc.text(`Date: ${new Date(income.date).toLocaleDateString()}`, 15, 105);
+      doc.text(`Payment Phase: Phase ${interiorIncomes.indexOf(income) + 1}`, 15, 115);
+      
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("PAID BY", 110, 85);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      if (estimate?.client) {
+        doc.text(estimate.client.name, 110, 95);
+        doc.text(estimate.client.location || "", 110, 105);
+        doc.text(estimate.client.phone || "", 110, 115);
+      }
+      
+      // PAYMENT RECEIPT heading
+      doc.setFillColor(0, 51, 102);
+      doc.rect(5, 130, 200, 12, 'F');
+      doc.setFontSize(14);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text("PAYMENT RECEIPT", 105, 138, { align: "center" });
+
+      // Payment Details Table
+      let yPos = 150;
+      const phaseNumber = interiorIncomes.indexOf(income) + 1;
+      
+      // Calculate totals
+      const totalProjectAmount = estimate?.totalAmount || 0;
+      const totalAmountPaid = interiorIncomes
+        .filter(inc => inc && inc.status === 'completed')
+        .reduce((sum, inc) => sum + (inc?.amount || 0), 0);
+      const balanceAmount = totalProjectAmount - totalAmountPaid;
+
+      // Create professional table for payment details
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Description', 'Amount']],
+        body: [
+          [`Phase ${phaseNumber} Payment`, `Rs. ${income.amount.toLocaleString()}`],
+          ['Total Project Amount', `Rs. ${totalProjectAmount.toLocaleString()}`],
+          ['Total Amount Paid', `Rs. ${totalAmountPaid.toLocaleString()}`],
+          ['Balance Amount', `Rs. ${balanceAmount.toLocaleString()}`]
+        ],
+        theme: 'grid',
+        headStyles: {
+          fillColor: [0, 51, 102],
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 10
+        },
+        bodyStyles: {
+          fontSize: 10,
+          textColor: 0
+        },
+        columnStyles: {
+          0: { cellWidth: 100, fontStyle: 'bold' },
+          1: { cellWidth: 90, halign: 'right' }
+        },
+        margin: { left: 10, right: 10 }
+      });
+
+      yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
+
+      // Payment Method Section
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0);
+      doc.text('Payment Method:', 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1), 15, yPos + 10);
+      
+      yPos += 25;
+
+      // Bank Details (only show if payment method is bank)
+      if (paymentMethod === 'bank' && selectedBank) {
+        doc.setFillColor(240, 240, 240);
+        doc.rect(5, yPos, 200, 8, 'F');
+        doc.setFontSize(10);
+        doc.setTextColor(0, 51, 102);
+        doc.setFont('helvetica', 'bold');
+        doc.text("BANK DETAILS", 10, yPos + 5);
+        
+        const bankYPos = yPos + 10;
+        const bankData = [
+          ['Bank Name', selectedBank.bankName],
+          ['Account Name', selectedBank.accountName],
+          ['Account Number', selectedBank.accountNumber],
+          ['IFSC Code', selectedBank.ifscCode],
+          ['UPI ID', selectedBank.upiId]
+        ];
+
+        autoTable(doc, {
+          startY: bankYPos,
+          body: bankData,
+          theme: 'grid',
+          bodyStyles: {
+            fontSize: 7,
+            textColor: 0
+          },
+          columnStyles: {
+            0: { cellWidth: 60, fontStyle: 'bold' },
+            1: { cellWidth: 130 }
+          },
+          margin: { left: 10, right: 10 }
+        });
+
+        yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
+      }
+
+      // Footer
+      const footerY = Math.max(yPos + 10, 260);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0);
+      doc.text('Thank you for your payment!', 105, footerY, { align: 'center' });
+      
+      // Computer generated receipt notice at the bottom
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(100, 100, 100);
+      doc.text('This is a computer generated receipt, no signature required.', 105, 285, { align: 'center' });
+      
+      const fileName = `Receipt_Phase_${phaseNumber}_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
+      doc.save(fileName);
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Receipt Downloaded',
+        text: 'Your receipt has been downloaded successfully.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      }); 
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Download Failed',
+        text: 'Failed to generate receipt PDF.',
+      });
+    }
+  };
+
+  const handleDownloadAllPaymentsReceipt = async () => {
+    const completedPayments = interiorIncomes.filter(income => income && income.status === 'completed');
     
-    // Invoice Details
-    doc.text('Invoice Details:', 20, 160);
-    doc.text(`Invoice Date: ${new Date().toLocaleDateString()}`, 20, 170);
-    doc.text(`Payment Phase: Phase ${interiorIncomes.indexOf(income) + 1}`, 20, 180);
-    
-    // Amount
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Amount: ₹${income.amount.toLocaleString()}`, 20, 200);
-    
-    // Footer
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Thank you for your business!', 105, 280, { align: 'center' });
-    
-    doc.save(`invoice-phase-${interiorIncomes.indexOf(income) + 1}-${estimate?.client?.name || 'client'}.pdf`);
+    if (completedPayments.length === 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'No Payments',
+        text: 'There are no completed payments to generate a receipt.',
+        confirmButtonText: 'OK'
+      });
+      return;
+    }
+
+    try {
+      const doc = new jsPDF();
+      
+      // Add full page border - only 4 sides
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+      doc.rect(5, 5, 200, 287);
+      
+      // Add professional header background with gradient effect
+      doc.setFillColor(0, 51, 102); // Dark blue
+      doc.rect(5, 5, 200, 45, 'F');
+      doc.setFillColor(0, 71, 142); // Lighter blue for accent
+      doc.rect(5, 45, 200, 20, 'F');
+      
+      // Add company details on left side with professional styling
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Takshaga Spatial Solutions", 15, 20);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text("2nd Floor, Opp. Panchayat Building", 15, 30);
+      doc.text("Upputhara P.O, Idukki District", 15, 35);
+      doc.text("Kerala – 685505, India", 15, 40);
+
+      // Add logo on right side
+      const logoUrl = '/logo.png';
+      try {
+        doc.addImage(logoUrl, 'PNG', 155, 8, 50, 50);
+      } catch {
+        console.log('Logo not found, continuing without logo');
+      }
+
+      // Add contact details in light blue area
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Website: www.takshaga.com", 105, 52, { align: 'center' });
+      doc.text("Email: info@takshaga.com", 105, 57, { align: 'center' });
+      doc.text("+91 98466 60624 | +91 95443 44332", 105, 62, { align: 'center' });
+      
+      // Add professional receipt details section
+      doc.setFillColor(245, 245, 245);
+      doc.roundedRect(5, 75, 200, 45, 2, 2, 'F');
+      
+      // Add receipt details on left in a structured format
+      doc.setTextColor(0);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("RECEIPT DETAILS", 15, 85);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Receipt No: RCP-ALL-${new Date().getFullYear()}-${String(estimate?._id || '').slice(-6).toUpperCase()}`, 15, 95);
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 15, 105);
+      doc.text(`Total Payments: ${completedPayments.length}`, 15, 115);
+      
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("PAID BY", 110, 85);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      if (estimate?.client) {
+        doc.text(estimate.client.name, 110, 95);
+        doc.text(estimate.client.location || "", 110, 105);
+        doc.text(estimate.client.phone || "", 110, 115);
+      }
+      
+      // PAYMENT RECEIPT heading
+      doc.setFillColor(0, 51, 102);
+      doc.rect(5, 130, 200, 12, 'F');
+      doc.setFontSize(14);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text("PAYMENT RECEIPT - ALL PAYMENTS", 105, 138, { align: "center" });
+
+      // Payment Details Table
+      let yPos = 150;
+      const totalProjectAmount = estimate?.totalAmount || 0;
+      const totalAmountPaid = completedPayments.reduce((sum, inc) => sum + (inc?.amount || 0), 0);
+      const balanceAmount = totalProjectAmount - totalAmountPaid;
+
+      // Create table body with all payments
+      const tableBody = completedPayments.map((income) => [
+        `Phase ${interiorIncomes.indexOf(income) + 1} Payment`,
+        `Rs. ${income.amount.toLocaleString()}`
+      ]);
+
+      // Add summary rows
+      tableBody.push(['Total Project Amount', `Rs. ${totalProjectAmount.toLocaleString()}`]);
+      tableBody.push(['Total Amount Paid', `Rs. ${totalAmountPaid.toLocaleString()}`]);
+      tableBody.push(['Balance Amount', `Rs. ${balanceAmount.toLocaleString()}`]);
+
+      // Create professional table for payment details
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Description', 'Amount']],
+        body: tableBody,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [0, 51, 102],
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 10
+        },
+        bodyStyles: {
+          fontSize: 9,
+          textColor: 0
+        },
+        columnStyles: {
+          0: { cellWidth: 100, fontStyle: 'bold' },
+          1: { cellWidth: 90, halign: 'right' }
+        },
+        margin: { left: 10, right: 10 },
+        didDrawPage: () => {
+          // Add border on each page
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(0.5);
+          doc.rect(5, 5, 200, 287);
+        }
+      });
+
+      yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
+
+      // Check if we need a new page for footer
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
+      }
+
+      // Footer
+      const footerY = Math.max(yPos + 10, 260);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0);
+      doc.text('Thank you for your payment!', 105, footerY, { align: 'center' });
+      
+      // Computer generated receipt notice at the bottom
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(100, 100, 100);
+      doc.text('This is a computer generated receipt, no signature required.', 105, 285, { align: 'center' });
+      
+      const fileName = `Receipt_All_Payments_${estimate?.client?.name?.replace(/\s+/g, '_') || 'client'}_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
+      doc.save(fileName);
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Receipt Downloaded',
+        text: 'Your consolidated receipt with all payments has been downloaded successfully.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Download Failed',
+        text: 'Failed to generate receipt PDF.',
+      });
+    }
   };
 
   const handleMarkAsPaid = async (income: InteriorIncome) => {
@@ -290,7 +824,7 @@ export default function ApprovedWorkDetailsPage() {
           Swal.fire({
             icon: 'success',
             title: 'Payment Marked as Paid',
-            text: 'Payment has been successfully marked as completed and next phase created.',
+            text: 'Payment has been successfully marked as completed. You can download the receipt from the payment card.',
             position: 'top-end',
             toast: true,
             showConfirmButton: false,
@@ -1332,30 +1866,47 @@ export default function ApprovedWorkDetailsPage() {
                 <DollarSign className="h-5 w-5 text-green-600" />
                 <span>Payment Details</span>
               </h3>
-              {(() => {
-                // Calculate total received amount
-                const totalReceived = interiorIncomes
-                  .filter(income => income && income.status === 'completed')
-                  .reduce((sum, income) => sum + (income?.amount || 0), 0);
-                
-                // Show button only if:
-                // 1. No payments exist, OR
-                // 2. Last payment is completed AND total received is less than estimate total
-                const shouldShowButton = interiorIncomes.length === 0 || 
-                  (interiorIncomes[interiorIncomes.length - 1] && 
-                   interiorIncomes[interiorIncomes.length - 1].status === 'completed' && 
-                   totalReceived < estimate.totalAmount);
-                
-                return shouldShowButton ? (
-                  <button
-                    onClick={handleAddPayment}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center space-x-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>Add Payment Phase</span>
-                  </button>
-                ) : null;
-              })()}
+              <div className="flex items-center space-x-2">
+                {(() => {
+                  const completedPayments = interiorIncomes.filter(income => income && income.status === 'completed');
+                  if (completedPayments.length > 0) {
+                    return (
+                      <button
+                        onClick={handleDownloadAllPaymentsReceipt}
+                        className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        title="Download All Payments Receipt"
+                      >
+                        <Download className="h-5 w-5" />
+                      </button>
+                    );
+                  }
+                  return null;
+                })()}
+                {(() => {
+                  // Calculate total received amount
+                  const totalReceived = interiorIncomes
+                    .filter(income => income && income.status === 'completed')
+                    .reduce((sum, income) => sum + (income?.amount || 0), 0);
+                  
+                  // Show button only if:
+                  // 1. No payments exist, OR
+                  // 2. Last payment is completed AND total received is less than estimate total
+                  const shouldShowButton = interiorIncomes.length === 0 || 
+                    (interiorIncomes[interiorIncomes.length - 1] && 
+                     interiorIncomes[interiorIncomes.length - 1].status === 'completed' && 
+                     totalReceived < estimate.totalAmount);
+                  
+                  return shouldShowButton ? (
+                    <button
+                      onClick={handleAddPayment}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center space-x-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Add Payment Phase</span>
+                    </button>
+                  ) : null;
+                })()}
+              </div>
             </div>
 
             {/* Financial Summary */}
@@ -1480,10 +2031,19 @@ export default function ApprovedWorkDetailsPage() {
                           </button>
                         </>
                       ) : (
-                        <div className="flex items-center space-x-2 text-green-600">
-                          <CheckCircle className="h-4 w-4" />
-                          <span className="text-sm font-medium">Payment Completed</span>
-                        </div>
+                        <>
+                          <button
+                            onClick={() => handleDownloadReceipt(income, income.method || 'cash')}
+                            className="flex items-center space-x-1 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                          >
+                            <Download className="h-4 w-4" />
+                            <span>Download Receipt</span>
+                          </button>
+                          <div className="flex items-center space-x-2 text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            <span className="text-sm font-medium">Payment Completed</span>
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
