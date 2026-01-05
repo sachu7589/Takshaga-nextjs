@@ -18,6 +18,7 @@ import {
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatDateDDMMYYYY, formatDateForFileName } from '@/app/utils/dateFormat';
 
 interface Item {
   id: string;
