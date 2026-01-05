@@ -57,6 +57,34 @@ interface Bank {
   upiId: string;
 }
 
+interface Measurement {
+  length: number;
+  breadth: number;
+}
+
+interface RunningMeasurement {
+  length: number;
+}
+
+interface Item {
+  id: string;
+  sectionId: string;
+  sectionName: string;
+  categoryName: string;
+  subCategoryName: string;
+  materialName: string;
+  type: 'area' | 'pieces' | 'running' | 'running_sq_feet';
+  length?: number;
+  breadth?: number;
+  measurements?: Measurement[];
+  pieces?: number;
+  runningLength?: number;
+  runningMeasurements?: RunningMeasurement[];
+  description: string;
+  totalAmount: number;
+  amountPerSqFt?: number;
+}
+
 interface Estimate {
   _id: string;
   userId: string;
@@ -66,6 +94,9 @@ interface Estimate {
   status: string;
   createdAt: string;
   updatedAt: string;
+  items?: Item[];
+  discount?: number;
+  discountType?: 'percentage' | 'fixed';
   client?: {
     name: string;
     email: string;
@@ -191,6 +222,455 @@ export default function ApprovedWorkDetailsPage() {
     router.push('/dashboard/interior-work/approved');
   };
 
+  const handleDownloadQuotation = async () => {
+    if (!estimate || !estimate.client) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Missing Information',
+        text: 'Unable to generate quotation PDF.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      });
+      return;
+    }
+
+    try {
+      // Fetch quotation number (count of all estimates)
+      let quotationNumber = 1;
+      try {
+        const estimatesResponse = await fetch('/api/interior-estimates');
+        if (estimatesResponse.ok) {
+          const estimatesData = await estimatesResponse.json();
+          quotationNumber = estimatesData.estimates?.length || 1;
+        }
+      } catch (error) {
+        console.log('Error fetching estimate count, using default:', error);
+        quotationNumber = 1;
+      }
+      const doc = new jsPDF();
+      
+      // Add full page border
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+      doc.rect(5, 5, 200, 287);
+      
+      // Add professional header background with gradient effect (same as estimate)
+      doc.setFillColor(0, 51, 102); // Dark blue
+      doc.rect(5, 5, 200, 45, 'F');
+      doc.setFillColor(0, 71, 142); // Lighter blue for accent
+      doc.rect(5, 45, 200, 20, 'F');
+      
+      // Add company details on left side with professional styling
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Takshaga Spatial Solutions", 15, 20);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text("2nd Floor, Opp. Panchayat Building", 15, 30);
+      doc.text("Upputhara P.O, Idukki District", 15, 35);
+      doc.text("Kerala – 685505, India", 15, 40);
+
+      // Add logo on right side
+      const logoUrl = '/logo.png';
+      try {
+        doc.addImage(logoUrl, 'PNG', 155, 8, 50, 50);
+      } catch {
+        console.log('Logo not found, continuing without logo');
+      }
+
+      // Add contact details in light blue area
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Website: www.takshaga.com", 105, 52, { align: 'center' });
+      doc.text("Email: info@takshaga.com", 105, 57, { align: 'center' });
+      doc.text("+91 90619 04333", 105, 62, { align: 'center' });
+      
+      let yPos = 75;
+      const pageEndY = 270;
+
+      // Main Heading
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0);
+      doc.text("INTERIOR DESIGN & EXECUTION QUOTATION", 105, yPos, { align: 'center' });
+      yPos += 15;
+
+      // Company Information Section (prefilled)
+      doc.setFontSize(11);
+      doc.setTextColor(0);
+      
+      // Company Name
+      doc.setFont('helvetica', 'bold');
+      doc.text("Company Name :  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Takshaga Spatial Solutions", 15 + doc.getTextWidth("Company Name :  "), yPos);
+      yPos += 8;
+      
+      // Address
+      doc.setFont('helvetica', 'bold');
+      doc.text("Address :  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text("2nd Floor, Opp. Panchayat Building", 15 + doc.getTextWidth("Address :  "), yPos);
+      yPos += 8;
+      doc.text("Upputhara P.O, Idukki District", 15 + doc.getTextWidth("Address :  "), yPos);
+      yPos += 8;
+      doc.text("Kerala – 685505, India", 15 + doc.getTextWidth("Address :  "), yPos);
+      yPos += 8;
+      
+      // Phone
+      doc.setFont('helvetica', 'bold');
+      doc.text("Phone :  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text("+91 90619 04333", 15 + doc.getTextWidth("Phone :  "), yPos);
+      yPos += 8;
+      
+      // Email
+      doc.setFont('helvetica', 'bold');
+      doc.text("Email :  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text("info@takshaga.com", 15 + doc.getTextWidth("Email :  "), yPos);
+      yPos += 10;
+      
+      // Underline below company details (low opacity)
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(15, yPos, 195, yPos);
+      yPos += 10;
+
+      // Quotation Details
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Quotation Details", 15, yPos);
+      yPos += 10;
+      doc.setFontSize(10);
+      
+      // Quotation No
+      doc.setFont('helvetica', 'bold');
+      doc.text("Quotation No:  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${quotationNumber}`, 15 + doc.getTextWidth("Quotation No:  "), yPos);
+      yPos += 8;
+      
+      // Date
+      doc.setFont('helvetica', 'bold');
+      doc.text("Date:  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatDateDDMMYYYY(new Date()), 15 + doc.getTextWidth("Date:  "), yPos);
+      yPos += 10;
+      
+      // Client Name
+      doc.setFont('helvetica', 'bold');
+      doc.text("Client Name:  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(estimate.client.name || '', 15 + doc.getTextWidth("Client Name:  "), yPos);
+      yPos += 8;
+      
+      // Place
+      doc.setFont('helvetica', 'bold');
+      doc.text("Place:  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(estimate.client.location || '', 15 + doc.getTextWidth("Place:  "), yPos);
+      yPos += 10;
+      
+      // Underline below Quotation Details (low opacity)
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(15, yPos, 195, yPos);
+      yPos += 10;
+
+      // Scope of Work
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Scope of Work", 15, yPos);
+      yPos += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const scopeText = "This quotation covers comprehensive interior design and execution services as per the approved drawings, material specifications, and detailed discussions. The scope includes complete design development, material procurement, skilled craftsmanship, project management, and quality assurance throughout the execution phase. All work will be carried out in accordance with industry standards and best practices, ensuring timely completion and adherence to the agreed specifications. Site coordination, supervision, and final finishing work are included as part of this comprehensive service package.";
+      const maxWidth = 180; // Maximum width for text (page width - margins)
+      const scopeLines = doc.splitTextToSize(scopeText, maxWidth);
+      scopeLines.forEach((line: string) => {
+        doc.text(line, 15, yPos);
+        yPos += 8;
+      });
+      yPos += 15;
+
+      // Detailed Cost Breakdown - Start on second page
+      doc.addPage();
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+      doc.rect(5, 5, 200, 287);
+      yPos = 20;
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Detailed Cost Breakdown", 15, yPos);
+      yPos += 10;
+
+      // Add estimate items if available
+      if (estimate.items && estimate.items.length > 0) {
+        // Organize items by category and subcategory (similar to estimate)
+        const organizedSections: Record<string, Record<string, Item[]>> = {};
+        estimate.items.forEach(item => {
+          const categoryName = item.categoryName || 'Uncategorized';
+          const subcategoryName = item.subCategoryName || 'Other';
+          if (!organizedSections[categoryName]) {
+            organizedSections[categoryName] = {};
+          }
+          if (!organizedSections[categoryName][subcategoryName]) {
+            organizedSections[categoryName][subcategoryName] = [];
+          }
+          organizedSections[categoryName][subcategoryName].push(item);
+        });
+
+        // Check if we need a new page
+        if (yPos > pageEndY - 100) {
+          doc.addPage();
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(0.5);
+          doc.rect(5, 5, 200, 287);
+          yPos = 20;
+        }
+
+        Object.entries(organizedSections).forEach(([_category, subcategories]) => {
+          Object.entries(subcategories).forEach(([_subcategory, items]) => {
+            if (yPos > pageEndY - 60) {
+              doc.addPage();
+              doc.setDrawColor(0, 0, 0);
+              doc.setLineWidth(0.5);
+              doc.rect(5, 5, 200, 287);
+              yPos = 20;
+            }
+
+            // Create table data for items
+            const tableData = items.map(item => {
+              const descriptionText = item.description || '';
+              const materialText = item.materialName || '';
+              let combinedText = descriptionText;
+              if (materialText) {
+                combinedText = descriptionText ? `${descriptionText} - ${materialText}` : materialText;
+              }
+              
+              return [
+                combinedText,
+                `Rs ${item.totalAmount.toFixed(2)}`
+              ];
+            });
+
+            autoTable(doc, {
+              startY: yPos,
+              head: [['Description', 'Amount']],
+              body: tableData,
+              theme: 'grid',
+              headStyles: {
+                fillColor: [0, 51, 102],
+                textColor: 255,
+                fontStyle: 'bold',
+                fontSize: 10
+              },
+              bodyStyles: {
+                fontSize: 9,
+                textColor: 0
+              },
+              columnStyles: {
+                0: { cellWidth: 140 },
+                1: { cellWidth: 50, halign: 'right' }
+              },
+              margin: { left: 15, right: 15 }
+            });
+
+            yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+          });
+        });
+
+        // Add subtotal and grand total
+        if (yPos > pageEndY - 40) {
+          doc.addPage();
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(0.5);
+          doc.rect(5, 5, 200, 287);
+          yPos = 20;
+        }
+
+        const subtotal = estimate.items.reduce((total, item) => total + (item.totalAmount || 0), 0);
+        doc.setDrawColor(189, 195, 199);
+        doc.setLineWidth(0.5);
+        doc.line(15, yPos, 195, yPos);
+        yPos += 8;
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0);
+        doc.text("Subtotal: Rs  ", 15, yPos);
+        doc.text(`${subtotal.toFixed(2)}`, 15 + doc.getTextWidth("Subtotal: Rs  "), yPos);
+        yPos += 10;
+        doc.setFontSize(11);
+        doc.text("Grand Total: Rs  ", 15, yPos);
+        doc.text(`${estimate.totalAmount.toFixed(2)}`, 15 + doc.getTextWidth("Grand Total: Rs  "), yPos);
+        yPos += 15;
+      } else {
+        // If no items, just show placeholder
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text("(Estimate particulars will be listed here)", 15, yPos);
+        yPos += 15;
+        doc.text("Subtotal: Rs _____________", 15, yPos);
+        yPos += 10;
+        doc.text("Grand Total: Rs ____________", 15, yPos);
+        yPos += 15;
+      }
+
+      // Payment Terms
+      if (yPos > pageEndY - 80) {
+        doc.addPage();
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
+        yPos = 20;
+      }
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Payment Terms", 15, yPos);
+      yPos += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text("50% advance on confirmation phase 1", 15, yPos);
+      yPos += 8;
+      doc.text("25% during execution", 15, yPos);
+      yPos += 8;
+      doc.text("25% on project completion", 15, yPos);
+      yPos += 8;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.text("(Payment terms can be customized as per agreement)", 15, yPos);
+      yPos += 15;
+
+      // Project Timeline
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Project Timeline", 15, yPos);
+      yPos += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Estimated completion: __________ days from work commencement", 15, yPos);
+      yPos += 15;
+
+      // Terms & Conditions
+      if (yPos > pageEndY - 100) {
+        doc.addPage();
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
+        yPos = 20;
+      }
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Terms & Conditions", 15, yPos);
+      yPos += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Quotation valid for ____ days from the date of issue.", 15, yPos);
+      yPos += 8;
+      doc.text("Any additional work will be charged separately.", 15, yPos);
+      yPos += 8;
+      doc.text("Electrical fittings, appliances, and loose furniture not included unless specified.", 15, yPos);
+      yPos += 8;
+      doc.text("Design changes after approval may affect cost and timeline.", 15, yPos);
+      yPos += 8;
+      doc.text("Site conditions may impact final execution.", 15, yPos);
+      yPos += 15;
+
+      // Declaration
+      if (yPos > pageEndY - 80) {
+        doc.addPage();
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
+        yPos = 20;
+      }
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Declaration", 15, yPos);
+      yPos += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const declarationText = "We confirm that the above prices are accurate and the work will be executed as per agreed specifications.";
+      const declarationMaxWidth = 180; // Maximum width for text (page width - margins)
+      const declarationLines = doc.splitTextToSize(declarationText, declarationMaxWidth);
+      declarationLines.forEach((line: string) => {
+        doc.text(line, 15, yPos);
+        yPos += 8;
+      });
+      yPos += 12;
+      
+      const signatureStartY = yPos;
+      
+      // Company signature section (left side)
+      doc.text("For Takshaga Spatial Solutions", 15, yPos);
+      yPos += 15;
+      doc.text("Authorized Signatory", 15, yPos);
+      yPos += 10;
+      doc.text("Name: ________________________", 15, yPos);
+      yPos += 10;
+      doc.text("Signature: ___________________", 15, yPos);
+      yPos += 10;
+      doc.text("Date: ________________________", 15, yPos);
+      
+      // Client signature section (right side)
+      yPos = signatureStartY;
+      const rightX = 110; // Starting x position for right side
+      doc.text(`For ${estimate.client.name || 'Client'}`, rightX, yPos);
+      yPos += 15;
+      doc.text("Client Signatory", rightX, yPos);
+      yPos += 10;
+      doc.text("Name: ________________________", rightX, yPos);
+      yPos += 10;
+      doc.text("Signature: ___________________", rightX, yPos);
+      yPos += 10;
+      doc.text("Date: ________________________", rightX, yPos);
+      
+      yPos += 20;
+
+      // Add page numbers
+      const pageCount = (doc.internal as unknown as { getNumberOfPages: () => number }).getNumberOfPages();
+      for(let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Page ${i} of ${pageCount}`, 105, 290, { align: 'center' });
+      }
+
+      const fileName = `Quotation_${estimate.client.name.replace(/\s+/g, '_')}_${formatDateForFileName(new Date())}.pdf`;
+      doc.save(fileName);
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Quotation Downloaded',
+        text: 'Your quotation has been downloaded successfully.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      });
+    } catch (error) {
+      console.error('Error generating quotation PDF:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Download Failed',
+        text: 'Failed to generate quotation PDF.',
+      });
+    }
+  };
+
   const handleDownloadInvoice = async (income: InteriorIncome) => {
     if (!selectedBank) {
       Swal.fire({
@@ -241,7 +721,7 @@ export default function ApprovedWorkDetailsPage() {
       doc.setFont('helvetica', 'normal');
       doc.text("Website: www.takshaga.com", 105, 52, { align: 'center' });
       doc.text("Email: info@takshaga.com", 105, 57, { align: 'center' });
-      doc.text("+91 98466 60624 | +91 95443 44332", 105, 62, { align: 'center' });
+      doc.text("+91 90619 04333", 105, 62, { align: 'center' });
       
       // Add professional invoice details section
       doc.setFillColor(245, 245, 245);
@@ -445,7 +925,7 @@ export default function ApprovedWorkDetailsPage() {
       doc.setFont('helvetica', 'normal');
       doc.text("Website: www.takshaga.com", 105, 52, { align: 'center' });
       doc.text("Email: info@takshaga.com", 105, 57, { align: 'center' });
-      doc.text("+91 98466 60624 | +91 95443 44332", 105, 62, { align: 'center' });
+      doc.text("+91 90619 04333", 105, 62, { align: 'center' });
       
       // Add professional receipt details section
       doc.setFillColor(245, 245, 245);
@@ -656,7 +1136,7 @@ export default function ApprovedWorkDetailsPage() {
       doc.setFont('helvetica', 'normal');
       doc.text("Website: www.takshaga.com", 105, 52, { align: 'center' });
       doc.text("Email: info@takshaga.com", 105, 57, { align: 'center' });
-      doc.text("+91 98466 60624 | +91 95443 44332", 105, 62, { align: 'center' });
+      doc.text("+91 90619 04333", 105, 62, { align: 'center' });
       
       // Add professional receipt details section
       doc.setFillColor(245, 245, 245);
@@ -1412,6 +1892,13 @@ export default function ApprovedWorkDetailsPage() {
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Work Details</h1>
+            <button
+              onClick={handleDownloadQuotation}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            >
+              <Download className="h-4 w-4" />
+              <span>Download Quotation</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
