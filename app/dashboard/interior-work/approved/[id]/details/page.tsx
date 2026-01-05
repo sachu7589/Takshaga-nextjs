@@ -412,6 +412,16 @@ export default function ApprovedWorkDetailsPage() {
 
       // Add estimate items if available
       if (estimate.items && estimate.items.length > 0) {
+        // Helper function for rounding sq feet
+        const customRoundSqFeet = (value: number): number => {
+          const floorValue = Math.floor(value);
+          const decimal = value - floorValue;
+          if (decimal >= 0.5) {
+            return floorValue + 1;
+          }
+          return floorValue + 0.5;
+        };
+
         // Organize items by category and subcategory (similar to estimate)
         const organizedSections: Record<string, Record<string, Item[]>> = {};
         estimate.items.forEach(item => {
@@ -426,18 +436,17 @@ export default function ApprovedWorkDetailsPage() {
           organizedSections[categoryName][subcategoryName].push(item);
         });
 
-        // Check if we need a new page
-        if (yPos > pageEndY - 100) {
-          doc.addPage();
-          doc.setDrawColor(0, 0, 0);
-          doc.setLineWidth(0.5);
-          doc.rect(5, 5, 200, 287);
-          yPos = 20;
-        }
+        const minSpaceNeeded = 50;
+        const categorySpacing = 20;
+        const subcategorySpacing = 15;
 
-        Object.entries(organizedSections).forEach(([_category, subcategories]) => {
-          Object.entries(subcategories).forEach(([_subcategory, items]) => {
-            if (yPos > pageEndY - 60) {
+        Object.entries(organizedSections).forEach(([category, subcategories]) => {
+          Object.entries(subcategories).forEach(([subcategory, items], subIndex) => {
+            const estimatedTableHeight = items.length * 12 + subcategorySpacing;
+            const totalBlockHeight = estimatedTableHeight + 20;
+
+            const remainingSpace = pageEndY - yPos;
+            if (remainingSpace < totalBlockHeight || (subIndex === 0 && remainingSpace < minSpaceNeeded)) {
               doc.addPage();
               doc.setDrawColor(0, 0, 0);
               doc.setLineWidth(0.5);
@@ -445,44 +454,221 @@ export default function ApprovedWorkDetailsPage() {
               yPos = 20;
             }
 
-            // Create table data for items
-            const tableData = items.map(item => {
-              const descriptionText = item.description || '';
-              const materialText = item.materialName || '';
-              let combinedText = descriptionText;
-              if (materialText) {
-                combinedText = descriptionText ? `${descriptionText} - ${materialText}` : materialText;
-              }
-              
-              return [
-                combinedText,
-                `Rs ${item.totalAmount.toFixed(2)}`
-              ];
-            });
+            // Category header (only for first subcategory)
+            if (subIndex === 0) {
+              yPos += 5;
+              doc.setFillColor(0, 51, 102);
+              doc.rect(10, yPos - 5, 190, 10, 'F');
+              doc.setFontSize(11);
+              doc.setTextColor(255, 255, 255);
+              doc.setFont('helvetica', 'bold');
+              doc.text(category, 20, yPos);
+              yPos += categorySpacing;
+            }
 
+            // Subcategory header
+            doc.setFillColor(236, 240, 241);
+            doc.rect(15, yPos - 5, 180, 8, 'F');
+            doc.setFontSize(10);
+            doc.setTextColor(44, 62, 80);
+            doc.text(subcategory, 25, yPos);
+            yPos += 10;
+
+            // Generate table based on item type
+            const getTableStructure = (items: Item[]) => {
+              if (!items || items.length === 0) {
+                throw new Error('No items to generate table structure');
+              }
+              const firstItem = items[0];
+              
+              if (firstItem.type === 'area') {
+                // Area type: Description, Measurement, Sq Feet, Amount per sq ft, Total
+                const tableData = items.map(item => {
+                  const descriptionText = item.description || '';
+                  const materialText = item.materialName || '';
+                  let combinedText = descriptionText;
+                  if (materialText) {
+                    combinedText = descriptionText ? `${descriptionText}\nMaterial: ${materialText}` : `Material: ${materialText}`;
+                  }
+
+                  // Handle multiple measurements
+                  let measurements = '';
+                  let totalSqFeet = 0;
+                  
+                  if (item.measurements && item.measurements.length > 0) {
+                    const measurementStrings = [];
+                    if (item.length && item.breadth) {
+                      measurementStrings.push(`${item.length}×${item.breadth}`);
+                      totalSqFeet += (item.length * item.breadth) / 929.03;
+                    }
+                    item.measurements.forEach((m) => {
+                      measurementStrings.push(`${m.length}×${m.breadth}`);
+                      totalSqFeet += (m.length * m.breadth) / 929.03;
+                    });
+                    measurements = measurementStrings.join('\n');
+                  } else if (item.length && item.breadth) {
+                    measurements = `${item.length}×${item.breadth}`;
+                    totalSqFeet = (item.length * item.breadth) / 929.03;
+                  }
+
+                  const amountPerSqFt = item.amountPerSqFt || 0;
+                  
+                  return [
+                    combinedText,
+                    measurements,
+                    customRoundSqFeet(totalSqFeet).toFixed(1),
+                    `Rs ${amountPerSqFt.toFixed(1)}`,
+                    `Rs ${item.totalAmount.toFixed(1)}`
+                  ];
+                });
+
+                return {
+                  head: [['Description', 'Measurement', 'Sq Feet', 'Amount per sq ft', 'Total']],
+                  body: tableData,
+                  columnStyles: {
+                    "0": { cellWidth: 70 },
+                    "1": { cellWidth: 30 },
+                    "2": { cellWidth: 25 },
+                    "3": { cellWidth: 30 },
+                    "4": { cellWidth: 25 }
+                  }
+                };
+              } else if (firstItem.type === 'pieces') {
+                // Pieces type: Description, No of Pieces, Amount per piece, Total
+                const tableData = items.map(item => {
+                  const descriptionText = item.description || '';
+                  const materialText = item.materialName || '';
+                  let combinedText = descriptionText;
+                  if (materialText) {
+                    combinedText = descriptionText ? `${descriptionText}\nMaterial: ${materialText}` : `Material: ${materialText}`;
+                  }
+
+                  const quantity = item.pieces || 1;
+                  const amountPerPiece = item.totalAmount / quantity;
+                  
+                  return [
+                    combinedText,
+                    quantity.toString(),
+                    `Rs ${amountPerPiece.toFixed(1)}`,
+                    `Rs ${item.totalAmount.toFixed(1)}`
+                  ];
+                });
+
+                return {
+                  head: [['Description', 'No of Pieces', 'Amount per piece', 'Total']],
+                  body: tableData,
+                  columnStyles: {
+                    "0": { cellWidth: 90 },
+                    "1": { cellWidth: 30 },
+                    "2": { cellWidth: 35 },
+                    "3": { cellWidth: 25 },
+                    "4": { cellWidth: 0 }
+                  }
+                };
+              } else if (firstItem.type === 'running' || firstItem.type === 'running_sq_feet') {
+                // Running type: Description, Length, Feet, Amount per ft, Total
+                const tableData = items.map(item => {
+                  const descriptionText = item.description || '';
+                  const materialText = item.materialName || '';
+                  let combinedText = descriptionText;
+                  if (materialText) {
+                    combinedText = descriptionText ? `${descriptionText}\nMaterial: ${materialText}` : `Material: ${materialText}`;
+                  }
+
+                  // Handle multiple running measurements
+                  let lengths = '';
+                  let totalLength = 0;
+                  
+                  if (item.runningMeasurements && item.runningMeasurements.length > 0) {
+                    const lengthStrings = [];
+                    if (item.runningLength) {
+                      lengthStrings.push(item.runningLength.toString());
+                      totalLength += item.runningLength;
+                    }
+                    item.runningMeasurements.forEach((m) => {
+                      lengthStrings.push(m.length.toString());
+                      totalLength += m.length;
+                    });
+                    lengths = lengthStrings.join('\n');
+                  } else if (item.runningLength) {
+                    lengths = item.runningLength.toString();
+                    totalLength = item.runningLength;
+                  }
+
+                  const totalFeet = totalLength / 30.48;
+                  const amountPerFt = totalFeet > 0 ? item.totalAmount / totalFeet : 0;
+                  
+                  return [
+                    combinedText,
+                    lengths,
+                    totalFeet.toFixed(1),
+                    `Rs ${amountPerFt.toFixed(1)}`,
+                    `Rs ${item.totalAmount.toFixed(1)}`
+                  ];
+                });
+
+                return {
+                  head: [['Description', 'Length', 'Feet', 'Amount per ft', 'Total']],
+                  body: tableData,
+                  columnStyles: {
+                    "0": { cellWidth: 70 },
+                    "1": { cellWidth: 30 },
+                    "2": { cellWidth: 25 },
+                    "3": { cellWidth: 30 },
+                    "4": { cellWidth: 25 }
+                  }
+                };
+              } else {
+                throw new Error('Unknown item type for table structure');
+              }
+            };
+
+            const tableStructure = getTableStructure(items);
+            
             autoTable(doc, {
               startY: yPos,
-              head: [['Description', 'Amount']],
-              body: tableData,
+              head: tableStructure.head,
+              body: tableStructure.body,
               theme: 'grid',
               headStyles: {
-                fillColor: [0, 51, 102],
-                textColor: 255,
-                fontStyle: 'bold',
-                fontSize: 10
+                fillColor: [248, 250, 252],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold'
               },
               bodyStyles: {
-                fontSize: 9,
-                textColor: 0
+                fillColor: [255, 255, 255],
+                textColor: [0, 0, 0]
               },
-              columnStyles: {
-                0: { cellWidth: 140 },
-                1: { cellWidth: 50, halign: 'right' }
-              },
-              margin: { left: 15, right: 15 }
+              styles: { fontSize: 8, cellPadding: 2 },
+              margin: { left: 15, right: 15 },
+              columnStyles: tableStructure.columnStyles,
+              didDrawCell: function(data) {
+                // Handle multi-line text in cells
+                if (data.section === 'body') {
+                  if (data.column.index === 1) {
+                    // Measurement/Length column - ensure proper line breaks
+                    let cellValue = '';
+                    if (Array.isArray(data.cell.text)) {
+                      cellValue = data.cell.text.join('\n');
+                    } else if (typeof data.cell.text === 'string') {
+                      cellValue = data.cell.text;
+                    } else if (data.cell.text !== null && data.cell.text !== undefined) {
+                      cellValue = String(data.cell.text);
+                    } else {
+                      cellValue = '';
+                    }
+                    
+                    // Split by newlines to ensure all measurements are shown
+                    if (cellValue.includes('×') || cellValue.includes('\n')) {
+                      const lines = cellValue.split('\n').filter(line => line.trim() !== '');
+                      data.cell.text = lines;
+                    }
+                  }
+                }
+              }
             });
-
-            yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+            
+            yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
           });
         });
 
