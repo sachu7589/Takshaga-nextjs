@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser, verifyToken, getTokenFromCookies } from '@/app/lib/auth';
 import dbConnect from '@/app/lib/db';
+import CommonExpense from '@/app/models/CommonExpense';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    const { clientId, category, notes, amount, date } = body;
+    const { category, notes, amount, date } = body;
 
     if (!category || !amount || !date) {
       return NextResponse.json({ error: 'Missing required fields: category, amount, date' }, { status: 400 });
@@ -35,30 +36,26 @@ export async function POST(request: NextRequest) {
       { _id: new mongoose.Types.ObjectId(currentUser.userId) }
     );
 
-    const expenseData = {
+    const commonExpense = new CommonExpense({
       userId: currentUser.userId,
-      clientId: clientId || null,
       category: category,
       notes: notes || '',
       amount: parseFloat(amount),
       date: new Date(date),
       addedBy: userDetails?.name || currentUser.email.split('@')[0],
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+    });
 
-    const result = await mongoose.connection.db.collection('expenses').insertOne(expenseData);
-    const createdExpense = await mongoose.connection.db.collection('expenses').findOne({ _id: result.insertedId });
+    await commonExpense.save();
 
     return NextResponse.json({ 
       success: true, 
-      expense: createdExpense, 
-      message: 'Expense created successfully' 
+      expense: commonExpense, 
+      message: 'Common expense created successfully' 
     });
 
   } catch (error) {
-    console.error('Error creating expense:', error);
-    return NextResponse.json({ error: 'Failed to create expense' }, { status: 500 });
+    console.error('Error creating common expense:', error);
+    return NextResponse.json({ error: 'Failed to create common expense' }, { status: 500 });
   }
 }
 
@@ -78,21 +75,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const mongoose = await dbConnect();
-    if (!mongoose.connection.db) {
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
-    }
-    
-    const { searchParams } = new URL(request.url);
-    const clientId = searchParams.get('clientId');
+    await dbConnect();
 
-    // Build query - if clientId provided, filter by it, otherwise get all expenses
-    const query = clientId ? { clientId: clientId } : {};
-
-    const expenses = await mongoose.connection.db.collection('expenses')
-      .find(query)
+    const expenses = await CommonExpense.find()
       .sort({ date: -1 })
-      .toArray();
+      .lean();
 
     return NextResponse.json({ 
       success: true, 
@@ -100,7 +87,8 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching expenses:', error);
-    return NextResponse.json({ error: 'Failed to fetch expenses' }, { status: 500 });
+    console.error('Error fetching common expenses:', error);
+    return NextResponse.json({ error: 'Failed to fetch common expenses' }, { status: 500 });
   }
-} 
+}
+
