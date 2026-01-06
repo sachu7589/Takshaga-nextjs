@@ -110,6 +110,9 @@ export default function InteriorEstimateDetailsPage() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showQuotationModal, setShowQuotationModal] = useState(false);
+  const [selectedTerms, setSelectedTerms] = useState<number[]>([]);
+  const [customTerms, setCustomTerms] = useState<string[]>(['']);
   const [estimateName, setEstimateName] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [discount, setDiscount] = useState<number>(0);
@@ -516,7 +519,16 @@ export default function InteriorEstimateDetailsPage() {
     }
   };
 
-  const handleDownloadQuotation = async () => {
+  // Default terms and conditions
+  const defaultTerms = [
+    "Quotation valid for ____ days from the date of issue.",
+    "Any additional work will be charged separately.",
+    "Electrical fittings, appliances, and loose furniture not included unless specified.",
+    "Design changes after approval may affect cost and timeline.",
+    "Site conditions may impact final execution."
+  ];
+
+  const handleDownloadQuotation = () => {
     if (!estimate || !clientDetails) {
       Swal.fire({
         icon: 'warning',
@@ -529,6 +541,34 @@ export default function InteriorEstimateDetailsPage() {
       });
       return;
     }
+    // Reset selections
+    setSelectedTerms([]);
+    setCustomTerms(['']);
+    setShowQuotationModal(true);
+  };
+
+  const handleAddCustomTerm = () => {
+    setCustomTerms([...customTerms, '']);
+  };
+
+  const handleRemoveCustomTerm = (index: number) => {
+    const newTerms = customTerms.filter((_, i) => i !== index);
+    setCustomTerms(newTerms.length > 0 ? newTerms : ['']);
+  };
+
+  const handleGenerateQuotationPDF = async () => {
+    if (!estimate || !clientDetails) {
+      return;
+    }
+
+    // Get all selected terms (default + custom)
+    const allSelectedTerms = [
+      ...selectedTerms.map(index => defaultTerms[index]),
+      ...customTerms.filter(term => term.trim() !== '')
+    ];
+
+    // Close modal
+    setShowQuotationModal(false);
 
     try {
       // Fetch quotation number (count of all estimates)
@@ -1030,31 +1070,33 @@ export default function InteriorEstimateDetailsPage() {
       doc.text("Estimated completion: __________ days from work commencement", 15, yPos);
       yPos += 15;
 
-      // Terms & Conditions
-      if (yPos > pageEndY - 100) {
-        doc.addPage();
-        doc.setDrawColor(0, 0, 0);
-        doc.setLineWidth(0.5);
-        doc.rect(5, 5, 200, 287);
-        yPos = 20;
-      }
+      // Terms & Conditions (only if terms are selected)
+      if (allSelectedTerms.length > 0) {
+        if (yPos > pageEndY - 100) {
+          doc.addPage();
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(0.5);
+          doc.rect(5, 5, 200, 287);
+          yPos = 20;
+        }
 
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text("Terms & Conditions", 15, yPos);
-      yPos += 10;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text("Quotation valid for ____ days from the date of issue.", 15, yPos);
-      yPos += 8;
-      doc.text("Any additional work will be charged separately.", 15, yPos);
-      yPos += 8;
-      doc.text("Electrical fittings, appliances, and loose furniture not included unless specified.", 15, yPos);
-      yPos += 8;
-      doc.text("Design changes after approval may affect cost and timeline.", 15, yPos);
-      yPos += 8;
-      doc.text("Site conditions may impact final execution.", 15, yPos);
-      yPos += 15;
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text("Terms & Conditions", 15, yPos);
+        yPos += 10;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        allSelectedTerms.forEach((term) => {
+          const termMaxWidth = 180;
+          const termLines = doc.splitTextToSize(term, termMaxWidth);
+          termLines.forEach((line: string) => {
+            doc.text(line, 15, yPos);
+            yPos += 8;
+          });
+        });
+        yPos += 15;
+      }
 
       // Declaration
       if (yPos > pageEndY - 80) {
@@ -3377,6 +3419,103 @@ We look forward to bringing your vision to life!
                 <Copy className="w-5 h-5" />
                 <span>Copy Link</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quotation Terms Modal */}
+      {showQuotationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Select Terms & Conditions</h3>
+              <button
+                onClick={() => setShowQuotationModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Default Terms */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Default Terms</h4>
+                <div className="space-y-2">
+                  {defaultTerms.map((term, index) => (
+                    <label key={index} className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedTerms.includes(index)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTerms([...selectedTerms, index]);
+                          } else {
+                            setSelectedTerms(selectedTerms.filter(i => i !== index));
+                          }
+                        }}
+                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <span className="text-sm text-gray-700 flex-1">{term}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Terms */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Custom Terms</h4>
+                <div className="space-y-3">
+                  {customTerms.map((term, index) => (
+                    <div key={index} className="flex items-start space-x-2">
+                      <input
+                        type="text"
+                        value={term}
+                        onChange={(e) => {
+                          const newTerms = [...customTerms];
+                          newTerms[index] = e.target.value;
+                          setCustomTerms(newTerms);
+                        }}
+                        placeholder="Enter custom term..."
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700"
+                      />
+                      {customTerms.length > 1 && (
+                        <button
+                          onClick={() => handleRemoveCustomTerm(index)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Remove term"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    onClick={handleAddCustomTerm}
+                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Custom Term</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setShowQuotationModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleGenerateQuotationPDF}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Download Quotation
+                </button>
+              </div>
             </div>
           </div>
         </div>
