@@ -17,7 +17,7 @@ import {
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { formatDateDDMMYYYY } from '@/app/utils/dateFormat';
+import { formatDateDDMMYYYY, formatDateForFileName } from '@/app/utils/dateFormat';
 
 interface Category {
   id: string;
@@ -513,6 +513,631 @@ export default function InteriorEstimateDetailsPage() {
     if (estimate) {
       setItems(estimate.items);
       setEstimateName(estimate.estimateName);
+    }
+  };
+
+  const handleDownloadQuotation = async () => {
+    if (!estimate || !clientDetails) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Missing Information',
+        text: 'Unable to generate quotation PDF.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      });
+      return;
+    }
+
+    try {
+      // Fetch quotation number (count of all estimates)
+      let quotationNumber = 1;
+      try {
+        const estimatesResponse = await fetch('/api/interior-estimates');
+        if (estimatesResponse.ok) {
+          const estimatesData = await estimatesResponse.json();
+          quotationNumber = estimatesData.estimates?.length || 1;
+        }
+      } catch (error) {
+        console.log('Error fetching estimate count, using default:', error);
+        quotationNumber = 1;
+      }
+      const doc = new jsPDF();
+      
+      // Add full page border
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+      doc.rect(5, 5, 200, 287);
+      
+      // Add professional header background with gradient effect (same as estimate)
+      doc.setFillColor(0, 51, 102); // Dark blue
+      doc.rect(5, 5, 200, 45, 'F');
+      doc.setFillColor(0, 71, 142); // Lighter blue for accent
+      doc.rect(5, 45, 200, 20, 'F');
+      
+      // Add company details on left side with professional styling
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Takshaga Spatial Solutions", 15, 20);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text("2nd Floor, Opp. Panchayat Building", 15, 30);
+      doc.text("Upputhara P.O, Idukki District", 15, 35);
+      doc.text("Kerala – 685505, India", 15, 40);
+
+      // Add logo on right side
+      const logoUrl = '/logo.png';
+      try {
+        doc.addImage(logoUrl, 'PNG', 155, 8, 50, 50);
+      } catch {
+        console.log('Logo not found, continuing without logo');
+      }
+
+      // Add contact details in light blue area
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Website: www.takshaga.com", 105, 52, { align: 'center' });
+      doc.text("Email: info@takshaga.com", 105, 57, { align: 'center' });
+      doc.text("+91 90619 04333", 105, 62, { align: 'center' });
+      
+      let yPos = 75;
+      const pageEndY = 270;
+
+      // Main Heading
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0);
+      doc.text("INTERIOR DESIGN & EXECUTION QUOTATION", 105, yPos, { align: 'center' });
+      yPos += 15;
+
+      // Company Information Section (prefilled)
+      doc.setFontSize(11);
+      doc.setTextColor(0);
+      
+      // Company Name
+      doc.setFont('helvetica', 'bold');
+      doc.text("Company Name :  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Takshaga Spatial Solutions", 15 + doc.getTextWidth("Company Name :  "), yPos);
+      yPos += 8;
+      
+      // Address
+      doc.setFont('helvetica', 'bold');
+      doc.text("Address :  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text("2nd Floor, Opp. Panchayat Building", 15 + doc.getTextWidth("Address :  "), yPos);
+      yPos += 8;
+      doc.text("Upputhara P.O, Idukki District", 15 + doc.getTextWidth("Address :  "), yPos);
+      yPos += 8;
+      doc.text("Kerala – 685505, India", 15 + doc.getTextWidth("Address :  "), yPos);
+      yPos += 8;
+      
+      // Phone
+      doc.setFont('helvetica', 'bold');
+      doc.text("Phone :  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text("+91 90619 04333", 15 + doc.getTextWidth("Phone :  "), yPos);
+      yPos += 8;
+      
+      // Email
+      doc.setFont('helvetica', 'bold');
+      doc.text("Email :  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text("info@takshaga.com", 15 + doc.getTextWidth("Email :  "), yPos);
+      yPos += 10;
+      
+      // Underline below company details (low opacity)
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(15, yPos, 195, yPos);
+      yPos += 10;
+
+      // Quotation Details
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Quotation Details", 15, yPos);
+      yPos += 10;
+      doc.setFontSize(10);
+      
+      // Quotation No
+      doc.setFont('helvetica', 'bold');
+      doc.text("Quotation No:  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${quotationNumber}`, 15 + doc.getTextWidth("Quotation No:  "), yPos);
+      yPos += 8;
+      
+      // Date
+      doc.setFont('helvetica', 'bold');
+      doc.text("Date:  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatDateDDMMYYYY(new Date()), 15 + doc.getTextWidth("Date:  "), yPos);
+      yPos += 10;
+      
+      // Client Name
+      doc.setFont('helvetica', 'bold');
+      doc.text("Client Name:  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(clientDetails.name || '', 15 + doc.getTextWidth("Client Name:  "), yPos);
+      yPos += 8;
+      
+      // Place
+      doc.setFont('helvetica', 'bold');
+      doc.text("Place:  ", 15, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(clientDetails.location || '', 15 + doc.getTextWidth("Place:  "), yPos);
+      yPos += 10;
+      
+      // Underline below Quotation Details (low opacity)
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(15, yPos, 195, yPos);
+      yPos += 10;
+
+      // Scope of Work
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Scope of Work", 15, yPos);
+      yPos += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const scopeText = "This quotation covers comprehensive interior design and execution services as per the approved drawings, material specifications, and detailed discussions. The scope includes complete design development, material procurement, skilled craftsmanship, project management, and quality assurance throughout the execution phase. All work will be carried out in accordance with industry standards and best practices, ensuring timely completion and adherence to the agreed specifications. Site coordination, supervision, and final finishing work are included as part of this comprehensive service package.";
+      const scopeMaxWidth = 180;
+      const scopeLines = doc.splitTextToSize(scopeText, scopeMaxWidth);
+      scopeLines.forEach((line: string) => {
+        doc.text(line, 15, yPos);
+        yPos += 8;
+      });
+      yPos += 15;
+
+      // Detailed Cost Breakdown - Start on second page
+      doc.addPage();
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+      doc.rect(5, 5, 200, 287);
+      yPos = 20;
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Detailed Cost Breakdown", 15, yPos);
+      yPos += 10;
+
+      // Add estimate items if available
+      if (estimate.items && estimate.items.length > 0) {
+        // Helper function for rounding sq feet
+        const customRoundSqFeet = (value: number): number => {
+          const floorValue = Math.floor(value);
+          const decimal = value - floorValue;
+          if (decimal >= 0.5) {
+            return floorValue + 1;
+          }
+          return floorValue + 0.5;
+        };
+
+        // Organize items by category and subcategory
+        const organizedSections: Record<string, Record<string, Item[]>> = {};
+        estimate.items.forEach(item => {
+          const categoryName = item.categoryName || 'Uncategorized';
+          const subcategoryName = item.subCategoryName || 'Other';
+          if (!organizedSections[categoryName]) {
+            organizedSections[categoryName] = {};
+          }
+          if (!organizedSections[categoryName][subcategoryName]) {
+            organizedSections[categoryName][subcategoryName] = [];
+          }
+          organizedSections[categoryName][subcategoryName].push(item);
+        });
+
+        const minSpaceNeeded = 50;
+        const categorySpacing = 20;
+        const subcategorySpacing = 15;
+
+        Object.entries(organizedSections).forEach(([category, subcategories]) => {
+          Object.entries(subcategories).forEach(([subcategory, items], subIndex) => {
+            const estimatedTableHeight = items.length * 12 + subcategorySpacing;
+            const totalBlockHeight = estimatedTableHeight + 20;
+
+            const remainingSpace = pageEndY - yPos;
+            if (remainingSpace < totalBlockHeight || (subIndex === 0 && remainingSpace < minSpaceNeeded)) {
+              doc.addPage();
+              doc.setDrawColor(0, 0, 0);
+              doc.setLineWidth(0.5);
+              doc.rect(5, 5, 200, 287);
+              yPos = 20;
+            }
+
+            // Category header (only for first subcategory)
+            if (subIndex === 0) {
+              yPos += 5;
+              doc.setFillColor(0, 51, 102);
+              doc.rect(10, yPos - 5, 190, 10, 'F');
+              doc.setFontSize(11);
+              doc.setTextColor(255, 255, 255);
+              doc.setFont('helvetica', 'bold');
+              doc.text(category, 20, yPos);
+              yPos += categorySpacing;
+            }
+
+            // Subcategory header
+            doc.setFillColor(236, 240, 241);
+            doc.rect(15, yPos - 5, 180, 8, 'F');
+            doc.setFontSize(10);
+            doc.setTextColor(44, 62, 80);
+            doc.text(subcategory, 25, yPos);
+            yPos += 10;
+
+            // Generate table based on item type
+            const getTableStructure = (items: Item[]) => {
+              if (!items || items.length === 0) {
+                throw new Error('No items to generate table structure');
+              }
+              const firstItem = items[0];
+              
+              if (firstItem.type === 'area') {
+                const tableData = items.map(item => {
+                  const descriptionText = item.description || '';
+                  const materialText = item.materialName || '';
+                  let combinedText = descriptionText;
+                  if (materialText) {
+                    combinedText = descriptionText ? `${descriptionText}\nMaterial: ${materialText}` : `Material: ${materialText}`;
+                  }
+
+                  let measurements = '';
+                  let totalSqFeet = 0;
+                  
+                  if (item.measurements && item.measurements.length > 0) {
+                    const measurementStrings = [];
+                    if (item.length && item.breadth) {
+                      measurementStrings.push(`${item.length}×${item.breadth}`);
+                      totalSqFeet += (item.length * item.breadth) / 929.03;
+                    }
+                    item.measurements.forEach((m) => {
+                      measurementStrings.push(`${m.length}×${m.breadth}`);
+                      totalSqFeet += (m.length * m.breadth) / 929.03;
+                    });
+                    measurements = measurementStrings.join('\n');
+                  } else if (item.length && item.breadth) {
+                    measurements = `${item.length}×${item.breadth}`;
+                    totalSqFeet = (item.length * item.breadth) / 929.03;
+                  }
+
+                  const amountPerSqFt = item.amountPerSqFt || 0;
+                  
+                  return [
+                    combinedText,
+                    measurements,
+                    customRoundSqFeet(totalSqFeet).toFixed(1),
+                    `Rs ${amountPerSqFt.toFixed(1)}`,
+                    `Rs ${item.totalAmount.toFixed(1)}`
+                  ];
+                });
+
+                return {
+                  head: [['Description', 'Measurement', 'Sq Feet', 'Amount per sq ft', 'Total']],
+                  body: tableData,
+                  columnStyles: {
+                    "0": { cellWidth: 70 },
+                    "1": { cellWidth: 30 },
+                    "2": { cellWidth: 25 },
+                    "3": { cellWidth: 30 },
+                    "4": { cellWidth: 25 }
+                  }
+                };
+              } else if (firstItem.type === 'pieces') {
+                const tableData = items.map(item => {
+                  const descriptionText = item.description || '';
+                  const materialText = item.materialName || '';
+                  let combinedText = descriptionText;
+                  if (materialText) {
+                    combinedText = descriptionText ? `${descriptionText}\nMaterial: ${materialText}` : `Material: ${materialText}`;
+                  }
+
+                  const quantity = item.pieces || 1;
+                  const amountPerPiece = item.totalAmount / quantity;
+                  
+                  return [
+                    combinedText,
+                    quantity.toString(),
+                    `Rs ${amountPerPiece.toFixed(1)}`,
+                    `Rs ${item.totalAmount.toFixed(1)}`
+                  ];
+                });
+
+                return {
+                  head: [['Description', 'No of Pieces', 'Amount per piece', 'Total']],
+                  body: tableData,
+                  columnStyles: {
+                    "0": { cellWidth: 90 },
+                    "1": { cellWidth: 30 },
+                    "2": { cellWidth: 35 },
+                    "3": { cellWidth: 25 },
+                    "4": { cellWidth: 0 }
+                  }
+                };
+              } else if (firstItem.type === 'running' || firstItem.type === 'running_sq_feet') {
+                const tableData = items.map(item => {
+                  const descriptionText = item.description || '';
+                  const materialText = item.materialName || '';
+                  let combinedText = descriptionText;
+                  if (materialText) {
+                    combinedText = descriptionText ? `${descriptionText}\nMaterial: ${materialText}` : `Material: ${materialText}`;
+                  }
+
+                  let lengths = '';
+                  let totalLength = 0;
+                  
+                  if (item.runningMeasurements && item.runningMeasurements.length > 0) {
+                    const lengthStrings = [];
+                    if (item.runningLength) {
+                      lengthStrings.push(item.runningLength.toString());
+                      totalLength += item.runningLength;
+                    }
+                    item.runningMeasurements.forEach((m) => {
+                      lengthStrings.push(m.length.toString());
+                      totalLength += m.length;
+                    });
+                    lengths = lengthStrings.join('\n');
+                  } else if (item.runningLength) {
+                    lengths = item.runningLength.toString();
+                    totalLength = item.runningLength;
+                  }
+
+                  const totalFeet = totalLength / 30.48;
+                  const amountPerFt = totalFeet > 0 ? item.totalAmount / totalFeet : 0;
+                  
+                  return [
+                    combinedText,
+                    lengths,
+                    totalFeet.toFixed(1),
+                    `Rs ${amountPerFt.toFixed(1)}`,
+                    `Rs ${item.totalAmount.toFixed(1)}`
+                  ];
+                });
+
+                return {
+                  head: [['Description', 'Length', 'Feet', 'Amount per ft', 'Total']],
+                  body: tableData,
+                  columnStyles: {
+                    "0": { cellWidth: 70 },
+                    "1": { cellWidth: 30 },
+                    "2": { cellWidth: 25 },
+                    "3": { cellWidth: 30 },
+                    "4": { cellWidth: 25 }
+                  }
+                };
+              } else {
+                throw new Error('Unknown item type for table structure');
+              }
+            };
+
+            const tableStructure = getTableStructure(items);
+            
+            autoTable(doc, {
+              startY: yPos,
+              head: tableStructure.head,
+              body: tableStructure.body,
+              theme: 'grid',
+              headStyles: {
+                fillColor: [248, 250, 252],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold'
+              },
+              bodyStyles: {
+                fillColor: [255, 255, 255],
+                textColor: [0, 0, 0]
+              },
+              styles: { fontSize: 8, cellPadding: 2 },
+              margin: { left: 15, right: 15 },
+              columnStyles: tableStructure.columnStyles,
+              didDrawCell: function(data) {
+                if (data.section === 'body') {
+                  if (data.column.index === 1) {
+                    let cellValue = '';
+                    if (Array.isArray(data.cell.text)) {
+                      cellValue = data.cell.text.join('\n');
+                    } else if (typeof data.cell.text === 'string') {
+                      cellValue = data.cell.text;
+                    } else if (data.cell.text !== null && data.cell.text !== undefined) {
+                      cellValue = String(data.cell.text);
+                    } else {
+                      cellValue = '';
+                    }
+                    
+                    if (cellValue.includes('×') || cellValue.includes('\n')) {
+                      const lines = cellValue.split('\n').filter(line => line.trim() !== '');
+                      data.cell.text = lines;
+                    }
+                  }
+                }
+              }
+            });
+            
+            yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+          });
+        });
+
+        // Add subtotal and grand total
+        if (yPos > pageEndY - 40) {
+          doc.addPage();
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(0.5);
+          doc.rect(5, 5, 200, 287);
+          yPos = 20;
+        }
+
+        const subtotal = estimate.items.reduce((total, item) => total + (item.totalAmount || 0), 0);
+        doc.setDrawColor(189, 195, 199);
+        doc.setLineWidth(0.5);
+        doc.line(15, yPos, 195, yPos);
+        yPos += 8;
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0);
+        doc.text("Subtotal: Rs  ", 15, yPos);
+        doc.text(`${subtotal.toFixed(2)}`, 15 + doc.getTextWidth("Subtotal: Rs  "), yPos);
+        yPos += 10;
+        doc.setFontSize(11);
+        doc.text("Grand Total: Rs  ", 15, yPos);
+        doc.text(`${estimate.totalAmount.toFixed(2)}`, 15 + doc.getTextWidth("Grand Total: Rs  "), yPos);
+        yPos += 15;
+      } else {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text("(Estimate particulars will be listed here)", 15, yPos);
+        yPos += 15;
+        doc.text("Subtotal: Rs _____________", 15, yPos);
+        yPos += 10;
+        doc.text("Grand Total: Rs ____________", 15, yPos);
+        yPos += 15;
+      }
+
+      // Payment Terms
+      if (yPos > pageEndY - 80) {
+        doc.addPage();
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
+        yPos = 20;
+      }
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Payment Terms", 15, yPos);
+      yPos += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text("50% advance on confirmation phase 1", 15, yPos);
+      yPos += 8;
+      doc.text("25% during execution", 15, yPos);
+      yPos += 8;
+      doc.text("25% on project completion", 15, yPos);
+      yPos += 8;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.text("(Payment terms can be customized as per agreement)", 15, yPos);
+      yPos += 15;
+
+      // Project Timeline
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Project Timeline", 15, yPos);
+      yPos += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Estimated completion: __________ days from work commencement", 15, yPos);
+      yPos += 15;
+
+      // Terms & Conditions
+      if (yPos > pageEndY - 100) {
+        doc.addPage();
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
+        yPos = 20;
+      }
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Terms & Conditions", 15, yPos);
+      yPos += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Quotation valid for ____ days from the date of issue.", 15, yPos);
+      yPos += 8;
+      doc.text("Any additional work will be charged separately.", 15, yPos);
+      yPos += 8;
+      doc.text("Electrical fittings, appliances, and loose furniture not included unless specified.", 15, yPos);
+      yPos += 8;
+      doc.text("Design changes after approval may affect cost and timeline.", 15, yPos);
+      yPos += 8;
+      doc.text("Site conditions may impact final execution.", 15, yPos);
+      yPos += 15;
+
+      // Declaration
+      if (yPos > pageEndY - 80) {
+        doc.addPage();
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
+        yPos = 20;
+      }
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Declaration", 15, yPos);
+      yPos += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const declarationText = "We confirm that the above prices are accurate and the work will be executed as per agreed specifications.";
+      const declarationMaxWidth = 180;
+      const declarationLines = doc.splitTextToSize(declarationText, declarationMaxWidth);
+      declarationLines.forEach((line: string) => {
+        doc.text(line, 15, yPos);
+        yPos += 8;
+      });
+      yPos += 12;
+      
+      const signatureStartY = yPos;
+      
+      // Company signature section (left side)
+      doc.text("For Takshaga Spatial Solutions", 15, yPos);
+      yPos += 15;
+      doc.text("Authorized Signatory", 15, yPos);
+      yPos += 10;
+      doc.text("Name: ________________________", 15, yPos);
+      yPos += 10;
+      doc.text("Signature: ___________________", 15, yPos);
+      yPos += 10;
+      doc.text("Date: ________________________", 15, yPos);
+      
+      // Client signature section (right side)
+      yPos = signatureStartY;
+      const rightX = 110;
+      doc.text(`For ${clientDetails.name || 'Client'}`, rightX, yPos);
+      yPos += 15;
+      doc.text("Client Signatory", rightX, yPos);
+      yPos += 10;
+      doc.text("Name: ________________________", rightX, yPos);
+      yPos += 10;
+      doc.text("Signature: ___________________", rightX, yPos);
+      yPos += 10;
+      doc.text("Date: ________________________", rightX, yPos);
+      yPos += 20;
+
+      // Add page numbers
+      const pageCount = (doc.internal as unknown as { getNumberOfPages: () => number }).getNumberOfPages();
+      for(let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Page ${i} of ${pageCount}`, 105, 290, { align: 'center' });
+      }
+
+      const fileName = `Quotation_${clientDetails.name.replace(/\s+/g, '_')}_${formatDateForFileName(new Date())}.pdf`;
+      doc.save(fileName);
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Quotation Downloaded',
+        text: 'Your quotation has been downloaded successfully.',
+        position: 'top-end',
+        toast: true,
+        showConfirmButton: false,
+        timer: 3000
+      });
+    } catch (error) {
+      console.error('Error generating quotation PDF:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Download Failed',
+        text: 'Failed to generate quotation PDF.',
+      });
     }
   };
 
@@ -1469,6 +2094,13 @@ We look forward to bringing your vision to life!
                 >
                   <Download className="h-4 w-4" />
                   <span>Download</span>
+                </button>
+                <button
+                  onClick={handleDownloadQuotation}
+                  className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer text-sm"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Download Quotation</span>
                 </button>
                 <button
                   onClick={handleShareEstimate}
