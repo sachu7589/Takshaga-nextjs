@@ -17,7 +17,8 @@ import {
   ChevronRight,
   CheckCircle,
   CreditCard,
-  Receipt
+  Receipt,
+  TrendingUp
 } from "lucide-react";
 import Image from "next/image";
 
@@ -144,6 +145,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       icon: Receipt,
       href: "/dashboard/expenses",
       active: pathname === "/dashboard/expenses" || pathname.startsWith("/dashboard/expenses")
+    },
+    {
+      name: "Cash Flow",
+      icon: TrendingUp,
+      href: "/dashboard/cash-flow",
+      active: pathname === "/dashboard/cash-flow" || pathname.startsWith("/dashboard/cash-flow")
     }
   ];
 
