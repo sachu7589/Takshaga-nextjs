@@ -71,6 +71,8 @@ interface CashFlowItem {
   notes?: string;
   amount: number;
   date: string;
+  createdAt?: string;
+  updatedAt?: string;
   addedBy?: string;
   status?: string;
   method?: string;
@@ -199,6 +201,8 @@ export default function CashFlowPage() {
         clientName: getClientName(inc.clientId),
         amount: inc.amount,
         date: inc.date,
+        createdAt: inc.createdAt,
+        updatedAt: inc.updatedAt,
         status: inc.status,
         method: inc.method,
         markedBy: inc.markedBy
@@ -216,6 +220,8 @@ export default function CashFlowPage() {
           notes: exp.notes,
           amount: exp.amount,
           date: exp.date,
+          createdAt: exp.createdAt,
+          updatedAt: exp.updatedAt,
           addedBy: exp.addedBy,
           expenseType: 'project' as const
         })),
@@ -228,14 +234,26 @@ export default function CashFlowPage() {
           notes: exp.notes,
           amount: exp.amount,
           date: exp.date,
+          createdAt: exp.createdAt,
+          updatedAt: exp.updatedAt,
           addedBy: exp.addedBy,
           expenseType: 'common' as const
         }))
     ];
 
-    return [...incomeItems, ...expenseItems].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    return [...incomeItems, ...expenseItems].sort((a, b) => {
+      // Sort primarily by updatedAt timestamp for chronological order (newest first)
+      // Fallback to createdAt if updatedAt is not available, then to date
+      const timeA = a.updatedAt 
+        ? new Date(a.updatedAt).getTime() 
+        : (a.createdAt ? new Date(a.createdAt).getTime() : new Date(a.date).getTime());
+      const timeB = b.updatedAt 
+        ? new Date(b.updatedAt).getTime() 
+        : (b.createdAt ? new Date(b.createdAt).getTime() : new Date(b.date).getTime());
+      
+      // Sort by timestamp (newest first)
+      return timeB - timeA;
+    });
   }, [incomes, expenses, commonExpenses, clients, dateFilter, customDateFrom, customDateTo]);
 
   const filteredIncomes = useMemo(() => 
