@@ -17,7 +17,6 @@ import {
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import QRCode from 'qrcode';
 import { formatDateDDMMYYYY, formatDateForFileName } from '@/app/utils/dateFormat';
 
 interface Item {
@@ -534,7 +533,7 @@ export default function CompletedWorkDetailsPage() {
       const balanceAmount = totalProjectAmount - totalAmountPaid;
 
       // Create table body with all payments
-      const tableBody = completedPayments.map((income, index) => [
+      const tableBody = completedPayments.map((income) => [
         `Phase ${interiorIncomes.indexOf(income) + 1} Payment`,
         `Rs. ${income.amount.toLocaleString()}`
       ]);
@@ -565,7 +564,7 @@ export default function CompletedWorkDetailsPage() {
           1: { cellWidth: 90, halign: 'right' }
         },
         margin: { left: 10, right: 10 },
-        didDrawPage: (data) => {
+        didDrawPage: () => {
           // Add border on each page
           doc.setDrawColor(0, 0, 0);
           doc.setLineWidth(0.5);
@@ -854,7 +853,6 @@ export default function CompletedWorkDetailsPage() {
     try {
       const doc = new jsPDF();
       let yPos = 20;
-      const pageWidth = 210;
       const rightMargin = 15;
       const leftMargin = 15;
 
@@ -936,7 +934,7 @@ export default function CompletedWorkDetailsPage() {
         doc.text("PAYMENT PHASES", leftMargin, yPos);
         yPos += 10;
 
-        const paymentData = completedPayments.map((income, index) => [
+        const paymentData = completedPayments.map((income) => [
           `Phase ${interiorIncomes.indexOf(income) + 1}`,
           formatDateDDMMYYYY(income.date),
           `Rs. ${income.amount.toLocaleString()}`,
@@ -1077,7 +1075,6 @@ export default function CompletedWorkDetailsPage() {
     try {
       const doc = new jsPDF();
       let yPos = 20;
-      const pageWidth = 210;
       const rightMargin = 15;
       const leftMargin = 15;
 

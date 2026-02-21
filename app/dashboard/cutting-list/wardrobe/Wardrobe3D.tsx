@@ -2,7 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Text, Html } from "@react-three/drei";
+import { OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
 
 interface Wardrobe3DProps {
@@ -16,7 +16,7 @@ interface Wardrobe3DProps {
   backPanelThickness?: number;
 }
 
-function Wardrobe({ width, height, depth, numberOfShelves, numberOfShutters, materialThickness = 18, backPanelThickness = 6 }: Omit<Wardrobe3DProps, "view">) {
+function Wardrobe({ width, height, depth, numberOfShelves, materialThickness = 18, backPanelThickness = 6 }: Omit<Wardrobe3DProps, "view" | "numberOfShutters">) {
   const meshRef = useRef<THREE.Group>(null);
 
   // Calculate dimensions in 3D space (convert mm to units, scale down)
@@ -148,7 +148,7 @@ function Wardrobe({ width, height, depth, numberOfShelves, numberOfShutters, mat
   );
 }
 
-function CameraController({ view, maxDim, controlsRef }: { view: "front" | "side" | "top"; maxDim: number; controlsRef: React.RefObject<any> }) {
+function CameraController({ view, maxDim, controlsRef }: { view: "front" | "side" | "top"; maxDim: number; controlsRef: React.RefObject<React.ComponentRef<typeof OrbitControls> | null> }) {
   const { camera } = useThree();
 
   useEffect(() => {
@@ -180,8 +180,8 @@ function CameraController({ view, maxDim, controlsRef }: { view: "front" | "side
   return null;
 }
 
-export default function Wardrobe3D({ width, height, depth, numberOfShelves, numberOfShutters, view, materialThickness, backPanelThickness }: Wardrobe3DProps) {
-  const controlsRef = useRef<any>(null);
+export default function Wardrobe3D({ width, height, depth, numberOfShelves, view, materialThickness, backPanelThickness, ...props }: Wardrobe3DProps) {
+  const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const scale = 0.01;
   
   // Ensure minimum dimensions
@@ -231,7 +231,6 @@ export default function Wardrobe3D({ width, height, depth, numberOfShelves, numb
         height={safeHeight}
         depth={safeDepth}
         numberOfShelves={numberOfShelves || 0}
-        numberOfShutters={numberOfShutters || 1}
         materialThickness={materialThickness || 18}
         backPanelThickness={backPanelThickness || 6}
       />

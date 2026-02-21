@@ -135,59 +135,58 @@ export default function CashFlowPage() {
     }
   };
 
-  const getClientName = (clientId?: string) => {
-    if (!clientId) return 'N/A';
-    const client = clients.find(c => c._id === clientId);
-    return client?.name || 'Unknown Client';
-  };
-
-  const getDateRange = () => {
-    const now = new Date();
-    let from: Date, to: Date;
-
-    switch (dateFilter) {
-      case 'today':
-        from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-        break;
-      case 'week':
-        const dayOfWeek = now.getDay();
-        from = new Date(now);
-        from.setDate(now.getDate() - dayOfWeek);
-        from.setHours(0, 0, 0, 0);
-        to = new Date(from);
-        to.setDate(from.getDate() + 6);
-        to.setHours(23, 59, 59, 999);
-        break;
-      case 'month':
-        from = new Date(now.getFullYear(), now.getMonth(), 1);
-        to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-        break;
-      case 'custom':
-        if (customDateFrom && customDateTo) {
-          from = new Date(customDateFrom);
-          to = new Date(customDateTo);
-          to.setHours(23, 59, 59, 999);
-        } else {
-          return null;
-        }
-        break;
-      default:
-        return null;
-    }
-
-    return { from, to };
-  };
-
-  const filterByDate = (dateString: string) => {
-    if (dateFilter === 'all') return true;
-    const range = getDateRange();
-    if (!range) return true;
-    const date = new Date(dateString);
-    return date >= range.from && date <= range.to;
-  };
-
   const combinedCashFlow = useMemo(() => {
+    const getClientName = (clientId?: string) => {
+      if (!clientId) return 'N/A';
+      const client = clients.find(c => c._id === clientId);
+      return client?.name || 'Unknown Client';
+    };
+
+    const getDateRange = () => {
+      const now = new Date();
+      let from: Date, to: Date;
+
+      switch (dateFilter) {
+        case 'today':
+          from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+          break;
+        case 'week':
+          const dayOfWeek = now.getDay();
+          from = new Date(now);
+          from.setDate(now.getDate() - dayOfWeek);
+          from.setHours(0, 0, 0, 0);
+          to = new Date(from);
+          to.setDate(from.getDate() + 6);
+          to.setHours(23, 59, 59, 999);
+          break;
+        case 'month':
+          from = new Date(now.getFullYear(), now.getMonth(), 1);
+          to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+          break;
+        case 'custom':
+          if (customDateFrom && customDateTo) {
+            from = new Date(customDateFrom);
+            to = new Date(customDateTo);
+            to.setHours(23, 59, 59, 999);
+          } else {
+            return null;
+          }
+          break;
+        default:
+          return null;
+      }
+
+      return { from, to };
+    };
+
+    const filterByDate = (dateString: string) => {
+      if (dateFilter === 'all') return true;
+      const range = getDateRange();
+      if (!range) return true;
+      const date = new Date(dateString);
+      return date >= range.from && date <= range.to;
+    };
     const incomeItems: CashFlowItem[] = incomes
       .filter(inc => {
         // Only show completed/paid income

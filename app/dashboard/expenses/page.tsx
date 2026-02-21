@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Receipt, DollarSign, Calendar, FileText, User, Briefcase, X, Search, Filter, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Plus, Receipt, DollarSign, Calendar, FileText, User, Briefcase, X, Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
 
@@ -84,13 +84,13 @@ export default function ExpensesPage() {
     fetchAllData();
   }, []);
 
-  const getClientName = (clientId: string) => {
-    const client = clients.find(c => c._id === clientId);
-    return client?.name || 'Unknown Client';
-  };
-
   // Combine and filter expenses
   const combinedExpenses = useMemo(() => {
+    const getClientName = (clientId: string) => {
+      const client = clients.find(c => c._id === clientId);
+      return client?.name || 'Unknown Client';
+    };
+
     const common = commonExpenses.map(exp => ({
       ...exp,
       type: 'common' as const,
