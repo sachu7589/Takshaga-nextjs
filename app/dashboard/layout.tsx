@@ -18,7 +18,8 @@ import {
   CheckCircle,
   CreditCard,
   Receipt,
-  TrendingUp
+  TrendingUp,
+  Scissors
 } from "lucide-react";
 import Image from "next/image";
 
@@ -151,6 +152,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       icon: TrendingUp,
       href: "/dashboard/cash-flow",
       active: pathname === "/dashboard/cash-flow" || pathname.startsWith("/dashboard/cash-flow")
+    },
+    {
+      name: "Cutting List",
+      icon: Scissors,
+      href: "/dashboard/cutting-list",
+      active: pathname === "/dashboard/cutting-list" || pathname.startsWith("/dashboard/cutting-list")
     }
   ];
 
