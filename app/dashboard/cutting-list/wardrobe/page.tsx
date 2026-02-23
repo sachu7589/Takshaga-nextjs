@@ -468,9 +468,12 @@ export default function WardrobePage() {
   // Modal state
   const [showCuttingListModal, setShowCuttingListModal] = useState(false);
   
-  // Sheet arrangement state
-  const [sheetLength, setSheetLength] = useState("");
-  const [sheetBreadth, setSheetBreadth] = useState("");
+  // Sheet arrangement state - per material
+  type MaterialSheetSize = {
+    length: string;
+    breadth: string;
+  };
+  const [materialSheetSizes, setMaterialSheetSizes] = useState<Map<string, MaterialSheetSize>>(new Map());
   const [cuttingWidth, setCuttingWidth] = useState("");
   const [showSheetArrangement, setShowSheetArrangement] = useState(false);
   
@@ -1053,167 +1056,161 @@ export default function WardrobePage() {
         margin: { left: 15, right: 15 }
       });
       
-      yPos = (doc as any).lastAutoTable.finalY + 15;
+      yPos = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 0) + 15;
       
-      // 2D Preview Section - Calculate image size first to determine page placement
+      // 2D Preview Section
+      // Try to capture and add 2D preview SVG
       let imageAdded = false;
-      let imageHeight = 0;
+      let pdfImageHeight = 0;
       
       try {
-        // Small delay to ensure SVG is rendered
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait longer to ensure SVG is fully rendered
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        if (wardrobe2DRef.current) {
-          const svgElement = wardrobe2DRef.current.querySelector('svg');
-          if (svgElement) {
-            // Get SVG dimensions first to calculate space needed
-            const viewBox = svgElement.getAttribute('viewBox');
-            const svgWidth = parseFloat(svgElement.getAttribute('width') || '0');
-            const svgHeight = parseFloat(svgElement.getAttribute('height') || '0');
-            
-            let width = svgWidth;
-            let height = svgHeight;
-            
-            if (viewBox) {
-              const vb = viewBox.split(' ');
-              width = parseFloat(vb[2]) || width;
-              height = parseFloat(vb[3]) || height;
+        if (!wardrobe2DRef.current) {
+          console.error("wardrobe2DRef.current is null");
+          throw new Error("2D preview ref is not available");
+        }
+        
+        const svgElement = wardrobe2DRef.current.querySelector('svg');
+        if (!svgElement) {
+          console.error("SVG element not found in wardrobe2DRef");
+          throw new Error("SVG element not found");
+        }
+        
+        // Wait for image to load before continuing
+        await new Promise<void>((resolve, reject) => {
+          // Clone the SVG to avoid modifying the original
+          const clonedSvg = svgElement.cloneNode(true) as SVGElement;
+          
+          // Serialize SVG to string
+          const svgData = new XMLSerializer().serializeToString(clonedSvg);
+          
+          // Get SVG dimensions from viewBox or width/height
+          const viewBox = clonedSvg.getAttribute('viewBox');
+          const svgWidth = parseFloat(clonedSvg.getAttribute('width') || '0');
+          const svgHeight = parseFloat(clonedSvg.getAttribute('height') || '0');
+          
+          let width = svgWidth;
+          let height = svgHeight;
+          
+          if (viewBox) {
+            const vb = viewBox.split(' ');
+            width = parseFloat(vb[2]) || width;
+            height = parseFloat(vb[3]) || height;
+          }
+          
+          // If still no dimensions, try to get from bounding box
+          if (width === 0 || height === 0) {
+            try {
+              const svgElement = clonedSvg as SVGSVGElement;
+              if (svgElement.getBBox) {
+                const bbox = svgElement.getBBox();
+                width = bbox.width || 800;
+                height = bbox.height || 600;
+              } else {
+                // If getBBox doesn't exist, use defaults
+                width = 800;
+                height = 600;
+              }
+            } catch {
+              // If getBBox fails, use defaults
+              width = 800;
+              height = 600;
             }
-            
-            if (width > 0 && height > 0) {
-              // Calculate PDF dimensions
+          }
+          
+          // Ensure we have valid dimensions
+          if (width === 0 || height === 0) {
+            reject(new Error('Invalid SVG dimensions'));
+            return;
+          }
+          
+          // Create canvas to render SVG
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Could not get canvas context'));
+            return;
+          }
+          
+          // Set canvas size (scale up for better quality)
+          const scale = 2;
+          canvas.width = width * scale;
+          canvas.height = height * scale;
+          
+          // Create data URL using blob for better compatibility
+          const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+          const url = URL.createObjectURL(svgBlob);
+          
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          
+          img.onload = () => {
+            try {
+              // Draw SVG to canvas
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              
+              // Convert canvas to data URL
+              const imgData = canvas.toDataURL('image/png', 1.0);
+              
+              // Clean up the blob URL
+              URL.revokeObjectURL(url);
+              
+              // Calculate dimensions to fit in PDF (max width 180mm)
               const maxWidth = 180;
               const aspectRatio = height / width;
-              imageHeight = maxWidth * aspectRatio;
+              const pdfWidth = maxWidth;
+              pdfImageHeight = maxWidth * aspectRatio;
+              
+              // Check if we need a new page for heading + image
+              const headingHeight = 8;
+              const spaceNeeded = headingHeight + pdfImageHeight + 10;
+              if (yPos + spaceNeeded > 280) {
+                doc.addPage();
+                yPos = 20;
+              }
+              
+              // Add heading only once, right before the image
+              doc.setFontSize(12);
+              doc.setFont('helvetica', 'bold');
+              doc.text("2D Preview", 105, yPos, { align: 'center' });
+              yPos += 8;
+              
+              // Add image to PDF
+              doc.addImage(imgData, 'PNG', 15, yPos, pdfWidth, pdfImageHeight);
+              imageAdded = true;
+              yPos += pdfImageHeight + 10;
+              resolve();
+            } catch (err) {
+              console.error("Error adding image to PDF:", err);
+              URL.revokeObjectURL(url);
+              reject(err);
             }
-          }
-        }
-      } catch (error) {
-        console.error("Error calculating image size:", error);
-      }
-      
-      // Check if we need a new page for heading + image
-      const headingHeight = 8;
-      const spaceNeeded = headingHeight + imageHeight + 10;
-      if (yPos + spaceNeeded > 280 && imageHeight > 0) {
-        doc.addPage();
-        yPos = 20;
-      }
-      
-      // Add heading (centered)
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text("2D Preview", 105, yPos, { align: 'center' });
-      yPos += 8;
-      
-      // Try to capture and add 2D preview SVG
-      try {
-        if (wardrobe2DRef.current) {
-          const svgElement = wardrobe2DRef.current.querySelector('svg');
-          if (svgElement) {
-            // Wait for image to load before continuing
-            await new Promise<void>((resolve, reject) => {
-              // Serialize SVG to string
-              const svgData = new XMLSerializer().serializeToString(svgElement);
-              
-              // Get SVG dimensions from viewBox or width/height
-              const viewBox = svgElement.getAttribute('viewBox');
-              const svgWidth = parseFloat(svgElement.getAttribute('width') || '0');
-              const svgHeight = parseFloat(svgElement.getAttribute('height') || '0');
-              
-              let width = svgWidth;
-              let height = svgHeight;
-              
-              if (viewBox) {
-                const vb = viewBox.split(' ');
-                width = parseFloat(vb[2]) || width;
-                height = parseFloat(vb[3]) || height;
-              }
-              
-              // Ensure we have valid dimensions
-              if (width === 0 || height === 0) {
-                reject(new Error('Invalid SVG dimensions'));
-                return;
-              }
-              
-              // Create canvas to render SVG
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              if (!ctx) {
-                reject(new Error('Could not get canvas context'));
-                return;
-              }
-              
-              // Set canvas size (scale up for better quality)
-              const scale = 2;
-              canvas.width = width * scale;
-              canvas.height = height * scale;
-              
-              // Create data URL directly from SVG (more reliable)
-              const svgBase64 = btoa(unescape(encodeURIComponent(svgData)));
-              const svgDataUrl = `data:image/svg+xml;base64,${svgBase64}`;
-              
-              const img = new Image();
-              img.crossOrigin = 'anonymous';
-              
-              img.onload = () => {
-                try {
-                  // Draw SVG to canvas
-                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                  
-                  // Convert canvas to data URL
-                  const imgData = canvas.toDataURL('image/png');
-                  
-                  // Calculate dimensions to fit in PDF (max width 180mm)
-                  const maxWidth = 180;
-                  const aspectRatio = height / width;
-                  let pdfWidth = maxWidth;
-                  let pdfHeight = maxWidth * aspectRatio;
-                  
-                  // Check if we need a new page (double check in case calculation was off)
-                  if (yPos + pdfHeight > 280) {
-                    doc.addPage();
-                    yPos = 20;
-                    // Re-add heading on new page (centered)
-                    doc.setFontSize(12);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text("2D Preview", 105, yPos, { align: 'center' });
-                    yPos += 8;
-                  }
-                  
-                  // Add image to PDF
-                  doc.addImage(imgData, 'PNG', 15, yPos, pdfWidth, pdfHeight);
-                  imageAdded = true;
-                  yPos += pdfHeight + 10;
-                  resolve();
-                } catch (err) {
-                  console.error("Error adding image to PDF:", err);
-                  reject(err);
-                }
-              };
-              
-              img.onerror = (err) => {
-                console.error("Error loading SVG image:", err);
-                reject(new Error('Failed to load SVG image'));
-              };
-              
-              img.src = svgDataUrl;
-            });
-          } else {
-            console.log("SVG element not found in wardrobe2DRef");
-          }
-        } else {
-          console.log("wardrobe2DRef.current is null");
-        }
+          };
+          
+          img.onerror = (err) => {
+            console.error("Error loading SVG image:", err);
+            URL.revokeObjectURL(url);
+            reject(new Error('Failed to load SVG image'));
+          };
+          
+          img.src = url;
+        });
       } catch (error) {
         console.error("Error capturing 2D preview:", error);
       }
       
       // Fallback if SVG not found or error
       if (!imageAdded) {
+        // Add heading only if we're adding fallback text
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text("2D Preview", 105, yPos, { align: 'center' });
+        yPos += 8;
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.text("2D preview is available in the application interface.", 15, yPos);
+        doc.text("2D preview could not be captured. Please ensure the 2D view is visible.", 15, yPos);
         yPos += 15;
       }
       
@@ -1226,12 +1223,17 @@ export default function WardrobePage() {
   
   const continueWithSheetArrangements = (doc: jsPDF, yPos: number) => {
     // Add sheet arrangement summary on first page if configured
-    if (sheetLength && sheetBreadth && cuttingWidth) {
+    const uniqueMaterials = getUniqueMaterials(cuttingList);
+    const allSizesEntered = uniqueMaterials.every(material => {
+      const size = materialSheetSizes.get(material);
+      return size && size.length && size.breadth;
+    });
+    
+    if (allSizesEntered && cuttingWidth) {
       const pieces = getPiecesForArrangement();
       const sheets = arrangePieces(
         pieces,
-        Number(sheetBreadth),
-        Number(sheetLength),
+        materialSheetSizes,
         Number(cuttingWidth)
       );
       
@@ -1244,13 +1246,31 @@ export default function WardrobePage() {
       // Sheet Summary
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Sheet Size: ${sheetBreadth}mm × ${sheetLength}mm`, 15, yPos);
-      yPos += 6;
       doc.text(`Cutting Width: ${cuttingWidth}mm`, 15, yPos);
       yPos += 6;
       doc.text(`Total Sheets Needed: ${sheets.length}`, 15, yPos);
       yPos += 6;
       doc.text(`Total Pieces: ${pieces.reduce((sum, p) => sum + p.quantity, 0)}`, 15, yPos);
+      yPos += 6;
+      
+      // Material grouping info with sheet sizes
+      const materialsCount = new Map<string, number>();
+      sheets.forEach(sheet => {
+        materialsCount.set(sheet.material, (materialsCount.get(sheet.material) || 0) + 1);
+      });
+      doc.setFont('helvetica', 'bold');
+      doc.text("Sheets by Material:", 15, yPos);
+      yPos += 6;
+      doc.setFont('helvetica', 'normal');
+      materialsCount.forEach((count, material) => {
+        const sheetSize = materialSheetSizes.get(material);
+        if (sheetSize) {
+          doc.text(`  ${material}: ${count} sheet(s) - ${sheetSize.breadth}mm × ${sheetSize.length}mm`, 15, yPos);
+        } else {
+          doc.text(`  ${material}: ${count} sheet(s)`, 15, yPos);
+        }
+        yPos += 6;
+      });
       
       // Add each sheet arrangement on separate pages (starting from page 2)
       addSheetArrangementsToPDF(doc, sheets);
@@ -1260,7 +1280,7 @@ export default function WardrobePage() {
     }
   };
   
-  const addSheetArrangementsToPDF = (doc: jsPDF, sheets: Array<{ pieces: Array<{ piece: Piece; x: number; y: number; rotated: boolean }>; width: number; height: number }>) => {
+  const addSheetArrangementsToPDF = (doc: jsPDF, sheets: Array<{ pieces: Array<{ piece: Piece; x: number; y: number; rotated: boolean }>; width: number; height: number; material: string }>) => {
     // Add each sheet on its own page, starting from page 2
     sheets.forEach((sheet, sheetIndex) => {
       // Always add a new page for each sheet arrangement (starting from page 2)
@@ -1272,7 +1292,13 @@ export default function WardrobePage() {
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       doc.text(`Sheet ${sheetIndex + 1} (${sheet.pieces.length} pieces)`, 105, yPos, { align: 'center' });
-      yPos += 15;
+      yPos += 8;
+      
+      // Material information
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Material: ${sheet.material}`, 105, yPos, { align: 'center' });
+      yPos += 10;
       
       // Draw sheet outline - make it larger to fill most of the page
       const maxWidth = 180;
@@ -1344,7 +1370,41 @@ export default function WardrobePage() {
     doc.save("wardrobe_cutting_list.pdf");
   };
 
+  // Get unique materials from cutting list
+  const getUniqueMaterials = (list: ReturnType<typeof generateCuttingList>): string[] => {
+    const materials = new Set<string>();
+    list.forEach(item => {
+      if (item.material) {
+        materials.add(item.material);
+      }
+    });
+    return Array.from(materials);
+  };
+
   const cuttingList = generateCuttingList();
+  
+  // Initialize sheet sizes for materials when cutting list changes
+  useEffect(() => {
+    const uniqueMaterials = getUniqueMaterials(cuttingList);
+    if (uniqueMaterials.length > 0) {
+      setMaterialSheetSizes(prev => {
+        const newMap = new Map(prev);
+        uniqueMaterials.forEach(material => {
+          if (!newMap.has(material)) {
+            newMap.set(material, { length: "", breadth: "" });
+          }
+        });
+        // Remove materials that are no longer in the cutting list
+        Array.from(newMap.keys()).forEach(material => {
+          if (!uniqueMaterials.includes(material)) {
+            newMap.delete(material);
+          }
+        });
+        return newMap;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cuttingList]);
 
   return (
     <div className="space-y-6">
@@ -1971,63 +2031,96 @@ export default function WardrobePage() {
                     
                     {!showSheetArrangement ? (
                       <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                        <div className="grid grid-cols-3 gap-4 mb-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Sheet Length (mm)
-                            </label>
-                            <input
-                              type="number"
-                              value={sheetLength}
-                              onChange={(e) => setSheetLength(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                              placeholder="e.g., 2440"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Sheet Breadth (mm)
-                            </label>
-                            <input
-                              type="number"
-                              value={sheetBreadth}
-                              onChange={(e) => setSheetBreadth(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                              placeholder="e.g., 1220"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Cutting Width (mm)
-                            </label>
-                            <input
-                              type="number"
-                              value={cuttingWidth}
-                              onChange={(e) => setCuttingWidth(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                              placeholder="e.g., 3"
-                            />
-                          </div>
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Cutting Width (mm)
+                          </label>
+                          <input
+                            type="number"
+                            value={cuttingWidth}
+                            onChange={(e) => setCuttingWidth(e.target.value)}
+                            className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                            placeholder="e.g., 3"
+                          />
                         </div>
-                        <p className="text-sm text-gray-600">
-                          Enter sheet dimensions and cutting width, then click "Arrange on Sheets" to see the optimal arrangement.
+                        
+                        <div className="space-y-6">
+                          {getUniqueMaterials(cuttingList).map((material) => {
+                            const sheetSize = materialSheetSizes.get(material) || { length: "", breadth: "" };
+                            return (
+                              <div key={material} className="bg-white rounded-lg p-4 border border-gray-300">
+                                <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                                  Sheet Size for {material}
+                                </h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Sheet Length (mm)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={sheetSize.length}
+                                      onChange={(e) => {
+                                        setMaterialSheetSizes(prev => {
+                                          const newMap = new Map(prev);
+                                          newMap.set(material, { ...sheetSize, length: e.target.value });
+                                          return newMap;
+                                        });
+                                      }}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                                      placeholder="e.g., 2440"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Sheet Breadth (mm)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={sheetSize.breadth}
+                                      onChange={(e) => {
+                                        setMaterialSheetSizes(prev => {
+                                          const newMap = new Map(prev);
+                                          newMap.set(material, { ...sheetSize, breadth: e.target.value });
+                                          return newMap;
+                                        });
+                                      }}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                                      placeholder="e.g., 1220"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        
+                        <p className="text-sm text-gray-600 mt-4">
+                          Enter sheet dimensions for each material and cutting width, then click &quot;Arrange on Sheets&quot; to see the optimal arrangement.
                         </p>
                       </div>
                     ) : (
-                      sheetLength && sheetBreadth && cuttingWidth ? (
-                        <SheetArrangement
-                          pieces={getPiecesForArrangement()}
-                          sheetWidth={Number(sheetBreadth)}
-                          sheetHeight={Number(sheetLength)}
-                          cuttingWidth={Number(cuttingWidth)}
-                        />
-                      ) : (
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                          <p className="text-yellow-800 text-sm">
-                            Please enter sheet length, breadth, and cutting width to see the arrangement.
-                          </p>
-                        </div>
-                      )
+                      (() => {
+                        const uniqueMaterials = getUniqueMaterials(cuttingList);
+                        const allSizesEntered = uniqueMaterials.every(material => {
+                          const size = materialSheetSizes.get(material);
+                          return size && size.length && size.breadth;
+                        });
+                        
+                        return allSizesEntered && cuttingWidth ? (
+                          <SheetArrangement
+                            pieces={getPiecesForArrangement()}
+                            materialSheetSizes={materialSheetSizes}
+                            cuttingWidth={Number(cuttingWidth)}
+                          />
+                        ) : (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <p className="text-yellow-800 text-sm">
+                              Please enter sheet length and breadth for all materials, and cutting width to see the arrangement.
+                            </p>
+                          </div>
+                        );
+                      })()
                     )}
                   </div>
                 </div>

@@ -22,27 +22,28 @@ type Sheet = {
   pieces: PlacedPiece[];
   width: number;
   height: number;
+  material: string;
 };
 
 interface SheetArrangementProps {
   pieces: Piece[];
-  sheetWidth: number;
-  sheetHeight: number;
+  materialSheetSizes: Map<string, { length: string; breadth: string }>;
   cuttingWidth: number;
 }
 
-// Bottom-left fill bin packing algorithm
-function arrangePieces(
-  pieces: Piece[],
+// Bottom-left fill bin packing algorithm for a single material
+function arrangePiecesForMaterial(
+  materialPieces: Piece[],
   sheetWidth: number,
   sheetHeight: number,
-  cuttingWidth: number
+  cuttingWidth: number,
+  material: string
 ): Sheet[] {
   const sheets: Sheet[] = [];
   
   // Expand pieces by quantity
   const expandedPieces: Piece[] = [];
-  pieces.forEach(piece => {
+  materialPieces.forEach(piece => {
     for (let i = 0; i < piece.quantity; i++) {
       expandedPieces.push({ ...piece, id: `${piece.id}_${i}` });
     }
@@ -54,7 +55,8 @@ function arrangePieces(
   let currentSheet: Sheet = {
     pieces: [],
     width: sheetWidth,
-    height: sheetHeight
+    height: sheetHeight,
+    material: material
   };
   
   // Track occupied areas using a simple grid approach
@@ -117,7 +119,8 @@ function arrangePieces(
       currentSheet = {
         pieces: [],
         width: sheetWidth,
-        height: sheetHeight
+        height: sheetHeight,
+        material: material
       };
       occupiedAreas.length = 0;
       
@@ -156,13 +159,54 @@ function arrangePieces(
   return sheets;
 }
 
+// Arrange pieces grouped by material
+function arrangePieces(
+  pieces: Piece[],
+  materialSheetSizes: Map<string, { length: string; breadth: string }>,
+  cuttingWidth: number
+): Sheet[] {
+  const allSheets: Sheet[] = [];
+  
+  // Group pieces by material
+  const piecesByMaterial = new Map<string, Piece[]>();
+  pieces.forEach(piece => {
+    if (!piecesByMaterial.has(piece.material)) {
+      piecesByMaterial.set(piece.material, []);
+    }
+    piecesByMaterial.get(piece.material)!.push(piece);
+  });
+  
+  // Arrange each material group separately with its own sheet size
+  piecesByMaterial.forEach((materialPieces, material) => {
+    const sheetSize = materialSheetSizes.get(material);
+    if (sheetSize && sheetSize.length && sheetSize.breadth) {
+      const sheetWidth = Number(sheetSize.breadth);
+      const sheetHeight = Number(sheetSize.length);
+      const materialSheets = arrangePiecesForMaterial(
+        materialPieces,
+        sheetWidth,
+        sheetHeight,
+        cuttingWidth,
+        material
+      );
+      allSheets.push(...materialSheets);
+    }
+  });
+  
+  return allSheets;
+}
+
 export default function SheetArrangement({
   pieces,
-  sheetWidth,
-  sheetHeight,
+  materialSheetSizes,
   cuttingWidth
 }: SheetArrangementProps) {
-  const sheets = arrangePieces(pieces, sheetWidth, sheetHeight, cuttingWidth);
+  const sheets = arrangePieces(pieces, materialSheetSizes, cuttingWidth);
+  
+  // Get sheet dimensions for display (use first sheet's dimensions for scale calculation)
+  const firstSheet = sheets[0];
+  const sheetWidth = firstSheet?.width || 3000;
+  const sheetHeight = firstSheet?.height || 3000;
   
   // Calculate scale for visualization
   const maxDimension = Math.max(sheetWidth, sheetHeight);
@@ -174,10 +218,6 @@ export default function SheetArrangement({
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h3 className="font-semibold text-blue-900 mb-2">Sheet Summary</h3>
         <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-blue-700">Sheet Size: </span>
-            <span className="font-semibold text-blue-900">{sheetWidth}mm × {sheetHeight}mm</span>
-          </div>
           <div>
             <span className="text-blue-700">Cutting Width: </span>
             <span className="font-semibold text-blue-900">{cuttingWidth}mm</span>
@@ -192,15 +232,37 @@ export default function SheetArrangement({
               {pieces.reduce((sum, p) => sum + p.quantity, 0)}
             </span>
           </div>
+          <div>
+            <span className="text-blue-700">Materials: </span>
+            <span className="font-semibold text-blue-900">
+              {Array.from(new Set(sheets.map(s => s.material))).length}
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-blue-200">
+          <div className="text-xs text-blue-700 font-medium mb-1">Sheet Sizes by Material:</div>
+          {Array.from(new Set(sheets.map(s => s.material))).map(material => {
+            const materialSheets = sheets.filter(s => s.material === material);
+            const sheetSize = materialSheetSizes.get(material);
+            if (!sheetSize) return null;
+            return (
+              <div key={material} className="text-xs text-blue-900">
+                <span className="font-semibold">{material}:</span> {sheetSize.breadth}mm × {sheetSize.length}mm ({materialSheets.length} sheet{materialSheets.length !== 1 ? 's' : ''})
+              </div>
+            );
+          })}
         </div>
       </div>
       
       <div className="space-y-8">
         {sheets.map((sheet, sheetIndex) => (
           <div key={sheetIndex} className="border border-gray-300 rounded-lg p-4 bg-white">
-            <h4 className="font-semibold text-gray-900 mb-4">
+            <h4 className="font-semibold text-gray-900 mb-2">
               Sheet {sheetIndex + 1} ({sheet.pieces.length} pieces)
             </h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Material: <span className="font-semibold text-gray-900">{sheet.material}</span>
+            </p>
             <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
               <svg
                 viewBox={`0 0 ${viewBoxSize} ${(sheetHeight / sheetWidth) * viewBoxSize}`}
