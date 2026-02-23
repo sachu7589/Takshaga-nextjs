@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ArrowLeft, X, FileText, Plus, Trash2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ArrowLeft, X, FileText, Plus, Trash2, Download } from "lucide-react";
 import dynamic from "next/dynamic";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import Wardrobe2D from "./Wardrobe2D";
+import SheetArrangement, { type Piece, arrangePieces } from "./SheetArrangement";
 
 // Nested partition structure
 type NestedPartition = {
@@ -464,6 +467,15 @@ export default function WardrobePage() {
   
   // Modal state
   const [showCuttingListModal, setShowCuttingListModal] = useState(false);
+  
+  // Sheet arrangement state
+  const [sheetLength, setSheetLength] = useState("");
+  const [sheetBreadth, setSheetBreadth] = useState("");
+  const [cuttingWidth, setCuttingWidth] = useState("");
+  const [showSheetArrangement, setShowSheetArrangement] = useState(false);
+  
+  // Refs for capturing images
+  const wardrobe2DRef = useRef<HTMLDivElement>(null);
 
   // Expanded arrangement state
   const [expandedArrangement, setExpandedArrangement] = useState<number | null>(null);
@@ -961,12 +973,375 @@ export default function WardrobePage() {
     }
 
     // Convert map to array
-    return Array.from(partsMap.values()).map(item => ({
+    return Array.from(partsMap.values()).map((item, index) => ({
       material: item.material,
       thickness: item.thickness,
       measurement: `${item.length}×${item.width} mm`,
-      quantity: item.quantity
+      quantity: item.quantity,
+      length: item.length,
+      width: item.width
     }));
+  };
+  
+  // Convert cutting list to pieces for sheet arrangement
+  const getPiecesForArrangement = (): Piece[] => {
+    return cuttingList.map((item, index) => ({
+      length: item.length,
+      width: item.width,
+      quantity: item.quantity,
+      material: item.material,
+      thickness: item.thickness,
+      id: `piece_${index}`
+    }));
+  };
+  
+  // Download PDF function
+  const handleDownloadPDF = async () => {
+    if (cuttingList.length === 0) {
+      alert("No cutting list available to download");
+      return;
+    }
+    
+    try {
+      const doc = new jsPDF();
+      let yPos = 20;
+      
+      // Title
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Wardrobe Cutting List", 105, yPos, { align: 'center' });
+      yPos += 15;
+      
+      // Box Summary
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Box Summary", 15, yPos);
+      yPos += 8;
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Height: ${height}mm`, 15, yPos);
+      doc.text(`Width: ${width}mm`, 60, yPos);
+      doc.text(`Depth: ${depth}mm`, 105, yPos);
+      doc.text(`Material: ${material || "N/A"}`, 150, yPos);
+      yPos += 7;
+      doc.text(`Thickness: ${materialThickness}mm`, 15, yPos);
+      doc.text(`Back Panel Material: ${backPanelMaterial || "N/A"}`, 60, yPos);
+      doc.text(`Back Panel Thickness: ${backPanelThickness}mm`, 150, yPos);
+      yPos += 15;
+      
+      // Cutting List Table
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Cutting List", 15, yPos);
+      yPos += 5;
+      
+      const tableData = cuttingList.map(item => [
+        item.material,
+        `${item.thickness}mm`,
+        item.measurement,
+        item.quantity.toString()
+      ]);
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Material', 'Thickness (mm)', 'Measurement', 'Quantity']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+        styles: { fontSize: 9 },
+        margin: { left: 15, right: 15 }
+      });
+      
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+      
+      // 2D Preview Section - Calculate image size first to determine page placement
+      let imageAdded = false;
+      let imageHeight = 0;
+      
+      try {
+        // Small delay to ensure SVG is rendered
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (wardrobe2DRef.current) {
+          const svgElement = wardrobe2DRef.current.querySelector('svg');
+          if (svgElement) {
+            // Get SVG dimensions first to calculate space needed
+            const viewBox = svgElement.getAttribute('viewBox');
+            const svgWidth = parseFloat(svgElement.getAttribute('width') || '0');
+            const svgHeight = parseFloat(svgElement.getAttribute('height') || '0');
+            
+            let width = svgWidth;
+            let height = svgHeight;
+            
+            if (viewBox) {
+              const vb = viewBox.split(' ');
+              width = parseFloat(vb[2]) || width;
+              height = parseFloat(vb[3]) || height;
+            }
+            
+            if (width > 0 && height > 0) {
+              // Calculate PDF dimensions
+              const maxWidth = 180;
+              const aspectRatio = height / width;
+              imageHeight = maxWidth * aspectRatio;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error calculating image size:", error);
+      }
+      
+      // Check if we need a new page for heading + image
+      const headingHeight = 8;
+      const spaceNeeded = headingHeight + imageHeight + 10;
+      if (yPos + spaceNeeded > 280 && imageHeight > 0) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      // Add heading (centered)
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("2D Preview", 105, yPos, { align: 'center' });
+      yPos += 8;
+      
+      // Try to capture and add 2D preview SVG
+      try {
+        if (wardrobe2DRef.current) {
+          const svgElement = wardrobe2DRef.current.querySelector('svg');
+          if (svgElement) {
+            // Wait for image to load before continuing
+            await new Promise<void>((resolve, reject) => {
+              // Serialize SVG to string
+              const svgData = new XMLSerializer().serializeToString(svgElement);
+              
+              // Get SVG dimensions from viewBox or width/height
+              const viewBox = svgElement.getAttribute('viewBox');
+              const svgWidth = parseFloat(svgElement.getAttribute('width') || '0');
+              const svgHeight = parseFloat(svgElement.getAttribute('height') || '0');
+              
+              let width = svgWidth;
+              let height = svgHeight;
+              
+              if (viewBox) {
+                const vb = viewBox.split(' ');
+                width = parseFloat(vb[2]) || width;
+                height = parseFloat(vb[3]) || height;
+              }
+              
+              // Ensure we have valid dimensions
+              if (width === 0 || height === 0) {
+                reject(new Error('Invalid SVG dimensions'));
+                return;
+              }
+              
+              // Create canvas to render SVG
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                reject(new Error('Could not get canvas context'));
+                return;
+              }
+              
+              // Set canvas size (scale up for better quality)
+              const scale = 2;
+              canvas.width = width * scale;
+              canvas.height = height * scale;
+              
+              // Create data URL directly from SVG (more reliable)
+              const svgBase64 = btoa(unescape(encodeURIComponent(svgData)));
+              const svgDataUrl = `data:image/svg+xml;base64,${svgBase64}`;
+              
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              
+              img.onload = () => {
+                try {
+                  // Draw SVG to canvas
+                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                  
+                  // Convert canvas to data URL
+                  const imgData = canvas.toDataURL('image/png');
+                  
+                  // Calculate dimensions to fit in PDF (max width 180mm)
+                  const maxWidth = 180;
+                  const aspectRatio = height / width;
+                  let pdfWidth = maxWidth;
+                  let pdfHeight = maxWidth * aspectRatio;
+                  
+                  // Check if we need a new page (double check in case calculation was off)
+                  if (yPos + pdfHeight > 280) {
+                    doc.addPage();
+                    yPos = 20;
+                    // Re-add heading on new page (centered)
+                    doc.setFontSize(12);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text("2D Preview", 105, yPos, { align: 'center' });
+                    yPos += 8;
+                  }
+                  
+                  // Add image to PDF
+                  doc.addImage(imgData, 'PNG', 15, yPos, pdfWidth, pdfHeight);
+                  imageAdded = true;
+                  yPos += pdfHeight + 10;
+                  resolve();
+                } catch (err) {
+                  console.error("Error adding image to PDF:", err);
+                  reject(err);
+                }
+              };
+              
+              img.onerror = (err) => {
+                console.error("Error loading SVG image:", err);
+                reject(new Error('Failed to load SVG image'));
+              };
+              
+              img.src = svgDataUrl;
+            });
+          } else {
+            console.log("SVG element not found in wardrobe2DRef");
+          }
+        } else {
+          console.log("wardrobe2DRef.current is null");
+        }
+      } catch (error) {
+        console.error("Error capturing 2D preview:", error);
+      }
+      
+      // Fallback if SVG not found or error
+      if (!imageAdded) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text("2D preview is available in the application interface.", 15, yPos);
+        yPos += 15;
+      }
+      
+      continueWithSheetArrangements(doc, yPos);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Failed to generate PDF. Please try again.");
+    }
+  };
+  
+  const continueWithSheetArrangements = (doc: jsPDF, yPos: number) => {
+    // Add sheet arrangement summary on first page if configured
+    if (sheetLength && sheetBreadth && cuttingWidth) {
+      const pieces = getPiecesForArrangement();
+      const sheets = arrangePieces(
+        pieces,
+        Number(sheetBreadth),
+        Number(sheetLength),
+        Number(cuttingWidth)
+      );
+      
+      // Sheet Arrangement Summary Section (on first page)
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Sheet Arrangement", 15, yPos);
+      yPos += 8;
+      
+      // Sheet Summary
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Sheet Size: ${sheetBreadth}mm × ${sheetLength}mm`, 15, yPos);
+      yPos += 6;
+      doc.text(`Cutting Width: ${cuttingWidth}mm`, 15, yPos);
+      yPos += 6;
+      doc.text(`Total Sheets Needed: ${sheets.length}`, 15, yPos);
+      yPos += 6;
+      doc.text(`Total Pieces: ${pieces.reduce((sum, p) => sum + p.quantity, 0)}`, 15, yPos);
+      
+      // Add each sheet arrangement on separate pages (starting from page 2)
+      addSheetArrangementsToPDF(doc, sheets);
+    } else {
+      doc.text("Sheet arrangement not configured", 15, yPos);
+      doc.save("wardrobe_cutting_list.pdf");
+    }
+  };
+  
+  const addSheetArrangementsToPDF = (doc: jsPDF, sheets: Array<{ pieces: Array<{ piece: Piece; x: number; y: number; rotated: boolean }>; width: number; height: number }>) => {
+    // Add each sheet on its own page, starting from page 2
+    sheets.forEach((sheet, sheetIndex) => {
+      // Always add a new page for each sheet arrangement (starting from page 2)
+      doc.addPage();
+      
+      let yPos = 20;
+      
+      // Sheet title
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Sheet ${sheetIndex + 1} (${sheet.pieces.length} pieces)`, 105, yPos, { align: 'center' });
+      yPos += 15;
+      
+      // Draw sheet outline - make it larger to fill most of the page
+      const maxWidth = 180;
+      const maxHeight = 250 - yPos;
+      const sheetAspectRatio = sheet.height / sheet.width;
+      let sheetWidth = maxWidth;
+      let sheetHeight = sheetWidth * sheetAspectRatio;
+      
+      // If height exceeds max, scale down
+      if (sheetHeight > maxHeight) {
+        sheetHeight = maxHeight;
+        sheetWidth = sheetHeight / sheetAspectRatio;
+      }
+      
+      // Center the sheet on the page
+      const startX = (210 - sheetWidth) / 2;
+      const scale = sheetWidth / sheet.width;
+      
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(1);
+      doc.rect(startX, yPos, sheetWidth, sheetHeight);
+      
+      // Draw pieces
+      sheet.pieces.forEach((placedPiece) => {
+        const pieceWidth = placedPiece.rotated 
+          ? placedPiece.piece.width 
+          : placedPiece.piece.length;
+        const pieceHeight = placedPiece.rotated 
+          ? placedPiece.piece.length 
+          : placedPiece.piece.width;
+        
+        const x = startX + placedPiece.x * scale;
+        const y = yPos + placedPiece.y * scale;
+        const w = pieceWidth * scale;
+        const h = pieceHeight * scale;
+        
+        // Draw piece
+        doc.setFillColor(200, 220, 240);
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(x, y, w, h, 'FD');
+        
+        // Draw cutting line (red border)
+        doc.setDrawColor(255, 0, 0);
+        doc.setLineWidth(0.3);
+        const cuttingW = Number(cuttingWidth) * scale;
+        doc.rect(x - cuttingW/2, y - cuttingW/2, w + cuttingW, h + cuttingW);
+        
+        // Add dimensions text if space allows
+        if (w > 15 && h > 10) {
+          doc.setFontSize(Math.max(6, Math.min(10, Math.min(w, h) * 0.15)));
+          doc.setTextColor(0, 0, 0);
+          doc.setFont('helvetica', 'bold');
+          const dimText = placedPiece.rotated 
+            ? `${placedPiece.piece.width}×${placedPiece.piece.length}`
+            : `${placedPiece.piece.length}×${placedPiece.piece.width}`;
+          doc.text(dimText, x + w/2, y + h/2, { align: 'center' });
+          
+          // Add rotation indicator if rotated
+          if (placedPiece.rotated && w > 25 && h > 15) {
+            doc.setFontSize(Math.max(5, Math.min(w, h) * 0.1));
+            doc.setTextColor(100, 100, 100);
+            doc.text("R", x + w/2, y + h/2 + Math.min(w, h) * 0.15, { align: 'center' });
+          }
+        }
+      });
+    });
+    
+    doc.save("wardrobe_cutting_list.pdf");
   };
 
   const cuttingList = generateCuttingList();
@@ -1420,20 +1795,22 @@ export default function WardrobePage() {
             <div className="flex-1 bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 rounded-lg relative overflow-hidden" style={{ minHeight: '500px', height: '100%' }}>
               {hasInputs ? (
                 previewMode === "2D" ? (
-                  <Wardrobe2D
-                    width={width}
-                    height={height}
-                    depth={depth}
-                    numberOfShelves={0}
-                    materialThickness={materialThickness}
-                    backPanelThickness={backPanelThickness}
-                    partitionType={partitionInputs.type as "VERTICAL" | "HORIZONTAL" | ""}
-                    partitionThickness={partitionThickness}
-                    columnWidths={partitionInputs.columns?.map(col => col.width) || []}
-                    rowHeights={partitionInputs.rows?.map(row => row.height) || []}
-                    columns={partitionInputs.columns}
-                    rows={partitionInputs.rows}
-                  />
+                  <div ref={wardrobe2DRef}>
+                    <Wardrobe2D
+                      width={width}
+                      height={height}
+                      depth={depth}
+                      numberOfShelves={0}
+                      materialThickness={materialThickness}
+                      backPanelThickness={backPanelThickness}
+                      partitionType={partitionInputs.type as "VERTICAL" | "HORIZONTAL" | ""}
+                      partitionThickness={partitionThickness}
+                      columnWidths={partitionInputs.columns?.map(col => col.width) || []}
+                      rowHeights={partitionInputs.rows?.map(row => row.height) || []}
+                      columns={partitionInputs.columns}
+                      rows={partitionInputs.rows}
+                    />
+                  </div>
                 ) : (
                   <Wardrobe3D
                     width={width}
@@ -1491,19 +1868,29 @@ export default function WardrobePage() {
           }}
         >
           <div 
-            className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white rounded-t-2xl">
               <h2 className="text-2xl font-semibold text-gray-900">Cutting List</h2>
-              <button
-                onClick={() => setShowCuttingListModal(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleDownloadPDF}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                  title="Download PDF"
+                >
+                  <Download className="h-4 w-4" />
+                  Download PDF
+                </button>
+                <button
+                  onClick={() => setShowCuttingListModal(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto flex-1 rounded-b-2xl">
               {cuttingList.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <p className="text-lg mb-2">No cutting list available</p>
@@ -1547,7 +1934,7 @@ export default function WardrobePage() {
                   </div>
 
                   {/* Cutting List Table */}
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto mb-6">
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-gray-100">
@@ -1568,6 +1955,80 @@ export default function WardrobePage() {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                  
+                  {/* Sheet Arrangement Section */}
+                  <div className="border-t border-gray-200 pt-6 mt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-semibold text-gray-900">Sheet Arrangement</h3>
+                      <button
+                        onClick={() => setShowSheetArrangement(!showSheetArrangement)}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm"
+                      >
+                        {showSheetArrangement ? "Hide Arrangement" : "Arrange on Sheets"}
+                      </button>
+                    </div>
+                    
+                    {!showSheetArrangement ? (
+                      <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                        <div className="grid grid-cols-3 gap-4 mb-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Sheet Length (mm)
+                            </label>
+                            <input
+                              type="number"
+                              value={sheetLength}
+                              onChange={(e) => setSheetLength(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                              placeholder="e.g., 2440"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Sheet Breadth (mm)
+                            </label>
+                            <input
+                              type="number"
+                              value={sheetBreadth}
+                              onChange={(e) => setSheetBreadth(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                              placeholder="e.g., 1220"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Cutting Width (mm)
+                            </label>
+                            <input
+                              type="number"
+                              value={cuttingWidth}
+                              onChange={(e) => setCuttingWidth(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                              placeholder="e.g., 3"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          Enter sheet dimensions and cutting width, then click "Arrange on Sheets" to see the optimal arrangement.
+                        </p>
+                      </div>
+                    ) : (
+                      sheetLength && sheetBreadth && cuttingWidth ? (
+                        <SheetArrangement
+                          pieces={getPiecesForArrangement()}
+                          sheetWidth={Number(sheetBreadth)}
+                          sheetHeight={Number(sheetLength)}
+                          cuttingWidth={Number(cuttingWidth)}
+                        />
+                      ) : (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                          <p className="text-yellow-800 text-sm">
+                            Please enter sheet length, breadth, and cutting width to see the arrangement.
+                          </p>
+                        </div>
+                      )
+                    )}
                   </div>
                 </div>
               )}
