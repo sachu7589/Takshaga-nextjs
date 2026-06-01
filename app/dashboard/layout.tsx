@@ -19,7 +19,8 @@ import {
   CreditCard,
   Receipt,
   TrendingUp,
-  Scissors
+  Scissors,
+  Award
 } from "lucide-react";
 import Image from "next/image";
 
@@ -158,6 +159,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       icon: Scissors,
       href: "/dashboard/cutting-list",
       active: pathname === "/dashboard/cutting-list" || pathname.startsWith("/dashboard/cutting-list")
+    },
+    {
+      name: "Issue Certificate",
+      icon: Award,
+      href: "/dashboard/certificates",
+      active: pathname === "/dashboard/certificates" || pathname.startsWith("/dashboard/certificates")
     }
   ];
 
