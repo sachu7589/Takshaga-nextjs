@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import Certificate from '@/app/models/Certificate';
 import { generateUniqueCertId } from '@/app/lib/certId';
+import { corsJson, corsPreflight } from '@/app/lib/cors';
 
 function serialize(c: InstanceType<typeof Certificate>) {
   return {
@@ -21,6 +22,10 @@ function serialize(c: InstanceType<typeof Certificate>) {
   };
 }
 
+export async function OPTIONS(request: NextRequest) {
+  return corsPreflight(request);
+}
+
 // GET all certificates (dashboard listing - returns active + disabled).
 // Optional ?status=active to filter.
 export async function GET(request: NextRequest) {
@@ -37,13 +42,14 @@ export async function GET(request: NextRequest) {
 
     const certificates = await Certificate.find(filter).sort({ createdAt: -1 });
 
-    return NextResponse.json({
+    return corsJson(request, {
       success: true,
       certificates: certificates.map(serialize),
     });
   } catch (error) {
     console.error('Error fetching certificates:', error);
-    return NextResponse.json(
+    return corsJson(
+      request,
       { success: false, message: 'Failed to fetch certificates' },
       { status: 500 }
     );
@@ -76,35 +82,40 @@ export async function POST(request: NextRequest) {
       !jobDesignation ||
       !content
     ) {
-      return NextResponse.json(
+      return corsJson(
+        request,
         { success: false, message: 'All required fields must be provided' },
         { status: 400 }
       );
     }
 
     if (!['experience', 'internship'].includes(certificateType)) {
-      return NextResponse.json(
+      return corsJson(
+        request,
         { success: false, message: 'Invalid certificate type' },
         { status: 400 }
       );
     }
 
     if (!['lifelong', 'date'].includes(validityType)) {
-      return NextResponse.json(
+      return corsJson(
+        request,
         { success: false, message: 'Invalid validity type' },
         { status: 400 }
       );
     }
 
     if (validityType === 'date' && !validityDate) {
-      return NextResponse.json(
+      return corsJson(
+        request,
         { success: false, message: 'Validity date is required when validity is a specific date' },
         { status: 400 }
       );
     }
 
     if (typeof content !== 'string' || content.length > 1000) {
-      return NextResponse.json(
+      return corsJson(
+        request,
         { success: false, message: 'Content must be 1000 characters or fewer' },
         { status: 400 }
       );
@@ -125,14 +136,15 @@ export async function POST(request: NextRequest) {
       status: 'active',
     });
 
-    return NextResponse.json({
+    return corsJson(request, {
       success: true,
       message: 'Certificate issued successfully',
       certificate: serialize(certificate),
     });
   } catch (error) {
     console.error('Error creating certificate:', error);
-    return NextResponse.json(
+    return corsJson(
+      request,
       { success: false, message: 'Failed to issue certificate' },
       { status: 500 }
     );
