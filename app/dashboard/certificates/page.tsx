@@ -14,6 +14,7 @@ import {
   User as UserIcon,
   Briefcase,
   FileText,
+  ExternalLink,
 } from "lucide-react";
 import Swal from "sweetalert2";
 
@@ -65,6 +66,9 @@ const toInputDate = (value?: string | null) => {
   if (Number.isNaN(d.getTime())) return "";
   return d.toISOString().split("T")[0];
 };
+
+const verifyUrl = (certId: string) =>
+  `https://www.takshaga.com/verify-certificate.html?id=${encodeURIComponent(certId)}`;
 
 const formatDate = (value?: string | null) => {
   if (!value) return "—";
@@ -238,13 +242,13 @@ export default function CertificatesPage() {
     }
   };
 
-  const copyCertId = async (certId: string) => {
+  const copyCertId = async (value: string, title = "Copied!") => {
     try {
-      await navigator.clipboard.writeText(certId);
+      await navigator.clipboard.writeText(value);
       Swal.fire({
         icon: "success",
-        title: "Copied!",
-        timer: 1000,
+        title,
+        timer: 1200,
         showConfirmButton: false,
         toast: true,
         position: "top-end",
@@ -485,11 +489,18 @@ export default function CertificatesPage() {
         ) : (
           <div className="divide-y divide-gray-200">
             {filtered.map((c) => (
-              <button
+              <div
                 key={c._id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelected(c)}
-                className="w-full text-left p-5 hover:bg-gray-50 transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelected(c);
+                  }
+                }}
+                className="w-full text-left p-5 hover:bg-gray-50 transition-colors cursor-pointer"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
@@ -524,8 +535,33 @@ export default function CertificatesPage() {
                       </span>
                     </div>
                   </div>
+                  <div
+                    className="flex items-center gap-2 shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <a
+                      href={verifyUrl(c.certId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                      title="Open public verification page"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" /> Verify
+                    </a>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyCertId(verifyUrl(c.certId), "Verify link copied");
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-1.5 text-xs text-gray-600 hover:text-blue-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Copy verify link"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         )}
@@ -623,6 +659,37 @@ export default function CertificatesPage() {
                       {formatDate(selected.createdAt)}
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Verify Link</div>
+                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
+                  <a
+                    href={verifyUrl(selected.certId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-700 hover:underline break-all flex-1 min-w-0"
+                  >
+                    {verifyUrl(selected.certId)}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => copyCertId(verifyUrl(selected.certId), "Verify link copied")}
+                    className="p-1.5 text-gray-600 hover:text-blue-700 hover:bg-gray-100 rounded"
+                    title="Copy link"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                  <a
+                    href={verifyUrl(selected.certId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 text-gray-600 hover:text-blue-700 hover:bg-gray-100 rounded"
+                    title="Open verify page"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
                 </div>
               </div>
 
