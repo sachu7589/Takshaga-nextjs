@@ -6,6 +6,8 @@ const ALLOWED_ORIGINS = new Set<string>([
   // local dev for the marketing site, harmless in prod
   'http://localhost:3000',
   'http://localhost:3001',
+  'http://localhost:5500',
+  'http://127.0.0.1:5500',
 ]);
 
 function resolveOrigin(request: NextRequest | Request): string | null {
