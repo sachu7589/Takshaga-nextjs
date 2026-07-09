@@ -6,13 +6,16 @@ import Link from "next/link";
 import Image from "next/image";
 
 export default function RegisterPage() {
+  const AUTHORIZATION_PASSWORD = "Takshagaspatialsolutions@2025";
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showAuthorizationPassword, setShowAuthorizationPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
+    authorizationPassword: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -31,6 +34,12 @@ export default function RegisterPage() {
       return;
     }
 
+    if (formData.authorizationPassword !== AUTHORIZATION_PASSWORD) {
+      setError("Invalid authorization password");
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
@@ -41,6 +50,7 @@ export default function RegisterPage() {
           name: formData.name,
           email: formData.email,
           password: formData.password,
+          authorizationPassword: formData.authorizationPassword,
         }),
       });
 
@@ -56,6 +66,7 @@ export default function RegisterPage() {
         email: "",
         password: "",
         confirmPassword: "",
+        authorizationPassword: "",
       });
       
     } catch (err: unknown) {
@@ -213,6 +224,39 @@ export default function RegisterPage() {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
                   {showConfirmPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Authorization Password Field */}
+            <div>
+              <label htmlFor="authorizationPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                Authorization Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="authorizationPassword"
+                  name="authorizationPassword"
+                  type={showAuthorizationPassword ? "text" : "password"}
+                  required
+                  value={formData.authorizationPassword}
+                  onChange={handleInputChange}
+                  className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  placeholder="Enter authorization password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAuthorizationPassword(!showAuthorizationPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  {showAuthorizationPassword ? (
                     <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
                   ) : (
                     <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />

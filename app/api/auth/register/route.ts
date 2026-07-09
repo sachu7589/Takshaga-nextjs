@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import User from '@/app/models/User';
 
+const REGISTRATION_AUTHORIZATION_PASSWORD = 'Takshagaspatialsolutions@2025';
+
 export async function POST(request: NextRequest) {
   try {
     console.log('Starting user registration...');
@@ -10,7 +12,7 @@ export async function POST(request: NextRequest) {
     await dbConnect();
     console.log('Database connected for registration');
 
-    const { email, password, name } = await request.json();
+    const { email, password, name, authorizationPassword } = await request.json();
     console.log('Registration data received:', { email, name, passwordLength: password?.length });
 
     // Validate input
@@ -19,6 +21,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
+      );
+    }
+
+    if (authorizationPassword !== REGISTRATION_AUTHORIZATION_PASSWORD) {
+      console.log('Validation failed: invalid authorization password');
+      return NextResponse.json(
+        { error: 'Invalid authorization password' },
+        { status: 403 }
       );
     }
 
