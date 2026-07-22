@@ -119,6 +119,8 @@ export default function GeneralEstimateViewPage() {
     if (!estimate) return { title: 'General Estimate', shortTitle: 'General' };
     
     switch (estimate.estimateType) {
+      case 'full-project':
+        return { title: 'Full Project Estimate', shortTitle: 'Full Project' };
       case 'other':
         return { title: 'General Estimate', shortTitle: 'General' };
       case 'permit':

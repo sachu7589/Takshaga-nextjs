@@ -41,7 +41,24 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { clientId, estimateName, items, totalAmount, subtotal, discount, discountType, estimateType } = body;
+    const {
+      clientId,
+      estimateName,
+      items,
+      totalAmount,
+      subtotal,
+      discount,
+      discountType,
+      estimateType,
+      sqFeet,
+      paymentStages,
+      constructionCostPerSqFt,
+      interiorCostType,
+      interiorCostPerSqFt,
+      interiorFixedCost,
+      projectCustomItems,
+      projectCostRows,
+    } = body;
 
     // Create general estimate
     const generalEstimate = await GeneralEstimate.create({
@@ -49,6 +66,14 @@ export async function POST(request: NextRequest) {
       clientId,
       estimateName,
       estimateType,
+      sqFeet: sqFeet || 0,
+      constructionCostPerSqFt: constructionCostPerSqFt || 0,
+      interiorCostType: interiorCostType || 'per_sqft',
+      interiorCostPerSqFt: interiorCostPerSqFt || 0,
+      interiorFixedCost: interiorFixedCost || 0,
+      projectCustomItems: projectCustomItems || [],
+      projectCostRows: projectCostRows || [],
+      paymentStages: paymentStages || [],
       items,
       totalAmount,
       subtotal,

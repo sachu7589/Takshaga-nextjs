@@ -5,7 +5,8 @@ import {
   FileText, 
   Home, 
   ArrowLeft,
-  CheckCircle
+  CheckCircle,
+  Building2
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatDateDDMMYYYY } from '@/app/utils/dateFormat';
@@ -55,6 +56,12 @@ interface GeneralEstimate {
   clientId: string;
   estimateName: string;
   estimateType: string;
+  sqFeet?: number;
+  projectCostRows?: Array<{ id: string; name: string; amount: number }>;
+  paymentStages?: Array<{ stage: string; amount: number }>;
+  workDetails?: Array<{ id: string; number: number; title: string; points: Array<{ id: string; text: string }> }>;
+  additionalWorks?: Array<{ id: string; text: string }>;
+  materialsUsed?: Array<{ id: string; material: string; details: string }>;
   items: Array<{
     id: string;
     particulars: string;
@@ -69,6 +76,44 @@ interface GeneralEstimate {
   status?: 'pending' | 'approved' | 'completed';
   createdAt: string;
   updatedAt: string;
+}
+
+/** Resume full-project at the furthest incomplete step; preview if finished. */
+function getFullProjectResumePath(
+  estimate: GeneralEstimate,
+  clientName: string | null
+): string {
+  const id = estimate._id;
+  const name = encodeURIComponent(clientName || "");
+  const clientId = estimate.clientId;
+
+  const hasAdditional =
+    estimate.status === 'completed' ||
+    (estimate.additionalWorks && estimate.additionalWorks.length > 0) ||
+    (estimate.materialsUsed && estimate.materialsUsed.length > 0);
+  if (hasAdditional) {
+    return `/dashboard/estimates/full-project/${id}/preview`;
+  }
+
+  if (estimate.workDetails && estimate.workDetails.length > 0) {
+    return `/dashboard/estimates/full-project/${id}/additional`;
+  }
+
+  const hasPayment =
+    estimate.paymentStages && estimate.paymentStages.some((s) => s.amount > 0);
+  if (hasPayment) {
+    return `/dashboard/estimates/full-project/${id}/work-details`;
+  }
+
+  const hasSetup =
+    (estimate.projectCostRows && estimate.projectCostRows.length > 0) ||
+    (estimate.sqFeet != null && estimate.sqFeet > 0) ||
+    (estimate.totalAmount != null && estimate.totalAmount > 0);
+  if (hasSetup) {
+    return `/dashboard/estimates/full-project?clientId=${clientId}&clientName=${name}&estimateId=${id}`;
+  }
+
+  return `/dashboard/estimates/full-project/setup?clientId=${clientId}&clientName=${name}&estimateId=${id}`;
 }
 
 export default function EstimatesPage() {
@@ -148,19 +193,55 @@ export default function EstimatesPage() {
       icon: <FileText className="h-8 w-8" />,
       color: "text-blue-600",
       bgColor: "bg-blue-50"
+    },
+    {
+      id: "full-project",
+      name: "Full Project Estimate",
+      description: "Complete project estimation based on total square feet",
+      icon: <Building2 className="h-8 w-8" />,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50"
     }
   ];
 
   const handleEstimateTypeSelect = (typeId: string) => {
     setSelectedEstimateType(typeId);
     
-    // Redirect based on estimate type
     if (typeId === 'interior') {
-      // Redirect to interior estimate page
       router.push(`/dashboard/estimates/interior?clientId=${clientId}&clientName=${clientName}`);
+    } else if (typeId === 'full-project') {
+      const existing = generalEstimates
+        .filter((e) => e.estimateType === 'full-project')
+        .sort((a, b) => {
+          const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+          const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+          return bTime - aTime;
+        })[0];
+
+      if (existing) {
+        router.push(getFullProjectResumePath(existing, clientName));
+      } else {
+        router.push(
+          `/dashboard/estimates/full-project/setup?clientId=${clientId}&clientName=${clientName}`
+        );
+      }
     } else {
-      // Redirect to general estimate page for other estimates
       router.push(`/dashboard/estimates/general?clientId=${clientId}&clientName=${clientName}&type=other`);
+    }
+  };
+
+  const getGeneralEstimateLabel = (estimateType: string) => {
+    switch (estimateType) {
+      case 'full-project':
+        return 'Full Project Estimate';
+      case 'permit':
+        return 'Permit Estimate';
+      case 'building':
+        return 'Building Estimation';
+      case '3d':
+        return '3D Estimate';
+      default:
+        return 'General Estimate';
     }
   };
 
@@ -210,7 +291,7 @@ export default function EstimatesPage() {
           <p className="text-gray-600">Choose the type of estimate you want to prepare</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {estimateTypes.map((type) => (
             <div
               key={type.id}
@@ -320,7 +401,11 @@ export default function EstimatesPage() {
               <div
                 key={estimate._id}
                 onClick={() => {
-                  router.push(`/dashboard/estimates/general/${estimate._id}`);
+                  if (estimate.estimateType === 'full-project') {
+                    router.push(getFullProjectResumePath(estimate, clientName));
+                  } else {
+                    router.push(`/dashboard/estimates/general/${estimate._id}`);
+                  }
                 }}
                 className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-200 cursor-pointer"
               >
@@ -349,7 +434,7 @@ export default function EstimatesPage() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 mb-3">
-                    {estimate.items.length} items • General Estimate
+                    {estimate.items.length} items • {getGeneralEstimateLabel(estimate.estimateType)}
                   </p>
                 </div>
                 
