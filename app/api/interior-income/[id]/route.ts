@@ -41,7 +41,7 @@ export async function PATCH(
     const { status, method, markedBy, amount } = body;
 
     // Validate required fields
-    if (!status && !amount) {
+    if (!status && amount === undefined) {
       return NextResponse.json(
         { success: false, message: "Status or amount is required" },
         { status: 400 }
@@ -68,13 +68,13 @@ export async function PATCH(
     if (markedBy) {
       updateData.markedBy = markedBy;
     }
-    if (amount) {
+    if (amount !== undefined && amount !== null) {
       updateData.amount = amount;
     }
 
-    // Update the interior income record
+    // Match by _id only — same scope as GET (client-shared payments, not creator-only)
     const result = await mongoose.connection.db.collection('interior_income').updateOne(
-      { _id: new mongoose.Types.ObjectId(id), userId: currentUser.userId },
+      { _id: new mongoose.Types.ObjectId(id) },
       {
         $set: updateData
       }
