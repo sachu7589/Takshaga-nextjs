@@ -27,6 +27,53 @@ import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
 import { formatDateDDMMYYYY, formatDateForFileName } from '@/app/utils/dateFormat';
 
+/** Round and format as Rs. with Indian-style grouping */
+function formatRsRounded(amount: number): string {
+  return `Rs. ${Math.round(amount).toLocaleString('en-IN')}`;
+}
+
+/** Convert number to Indian English words (lowercase), e.g. 185605 → "one lakh eighty five thousand six hundred and five" */
+function numberToIndianWords(amount: number): string {
+  const n = Math.round(Math.abs(amount));
+  if (n === 0) return 'zero';
+
+  const ones = [
+    '', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+    'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen',
+  ];
+  const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+  const twoDigits = (x: number): string => {
+    if (x < 20) return ones[x];
+    const o = x % 10;
+    return `${tens[Math.floor(x / 10)]}${o ? ` ${ones[o]}` : ''}`;
+  };
+
+  const threeDigits = (x: number): string => {
+    const h = Math.floor(x / 100);
+    const r = x % 100;
+    if (h && r) return `${ones[h]} hundred and ${twoDigits(r)}`;
+    if (h) return `${ones[h]} hundred`;
+    return twoDigits(r);
+  };
+
+  const crore = Math.floor(n / 10000000);
+  const lakh = Math.floor((n % 10000000) / 100000);
+  const thousand = Math.floor((n % 100000) / 1000);
+  const rest = n % 1000;
+
+  const parts: string[] = [];
+  if (crore) parts.push(`${twoDigits(crore)} crore`);
+  if (lakh) parts.push(`${twoDigits(lakh)} lakh`);
+  if (thousand) parts.push(`${twoDigits(thousand)} thousand`);
+  if (rest) {
+    if (parts.length && rest < 100) parts.push(`and ${twoDigits(rest)}`);
+    else parts.push(threeDigits(rest));
+  }
+
+  return parts.join(' ');
+}
+
 interface Stage {
   _id: string;
   userId: string;
@@ -1407,44 +1454,97 @@ export default function ApprovedWorkDetailsPage() {
       const totalAmountPaid = completedPayments.reduce((sum, inc) => sum + (inc?.amount || 0), 0);
       const balanceAmount = totalProjectAmount - totalAmountPaid;
 
-      // Create table body with all payments
-      const tableBody = completedPayments.map((income) => [
+      // Single professional financial table: left payments | right project total | balance footer
+      const roundedBalance = Math.round(balanceAmount);
+      const paymentRows = completedPayments.map((income) => [
         `Phase ${interiorIncomes.indexOf(income) + 1} Payment`,
-        `Rs. ${income.amount.toLocaleString()}`
+        formatRsRounded(income.amount),
       ]);
+      const rowCount = paymentRows.length + 1; // + Total Amount Paid
 
-      // Add summary rows
-      tableBody.push(['Total Project Amount', `Rs. ${totalProjectAmount.toLocaleString()}`]);
-      tableBody.push(['Total Amount Paid', `Rs. ${totalAmountPaid.toLocaleString()}`]);
-      tableBody.push(['Balance Amount', `Rs. ${balanceAmount.toLocaleString()}`]);
+      const tableBody = [
+        [
+          paymentRows[0]?.[0] ?? '',
+          paymentRows[0]?.[1] ?? '',
+          { content: 'Total Project Amount', rowSpan: rowCount, styles: { valign: 'middle', fillColor: [255, 251, 235] } },
+          {
+            content: formatRsRounded(totalProjectAmount),
+            rowSpan: rowCount,
+            styles: { valign: 'middle', halign: 'right', fillColor: [255, 251, 235], fontStyle: 'bold' },
+          },
+        ],
+        ...paymentRows.slice(1).map((row) => [row[0], row[1]]),
+        [
+          { content: 'Total Amount Paid', styles: { fillColor: [232, 240, 254], fontStyle: 'bold' } },
+          {
+            content: formatRsRounded(totalAmountPaid),
+            styles: { fillColor: [232, 240, 254], fontStyle: 'bold', halign: 'right' },
+          },
+        ],
+        [
+          {
+            content: `Balance Amount Due: ${formatRsRounded(roundedBalance)}`,
+            colSpan: 4,
+            styles: {
+              fillColor: [0, 51, 102],
+              textColor: 255,
+              fontStyle: 'bold',
+              halign: 'center',
+              fontSize: 11,
+              cellPadding: 5,
+            },
+          },
+        ],
+        [
+          {
+            content: numberToIndianWords(roundedBalance),
+            colSpan: 4,
+            styles: {
+              fillColor: [245, 247, 250],
+              textColor: [40, 40, 40],
+              fontStyle: 'italic',
+              halign: 'center',
+              fontSize: 9,
+              cellPadding: 4,
+            },
+          },
+        ],
+      ];
 
-      // Create professional table for payment details
       autoTable(doc, {
         startY: yPos,
-        head: [['Description', 'Amount']],
+        head: [['Description', 'Amount', 'Description', 'Amount']],
         body: tableBody,
         theme: 'grid',
         headStyles: {
           fillColor: [0, 51, 102],
           textColor: 255,
           fontStyle: 'bold',
-          fontSize: 10
+          fontSize: 9,
+          halign: 'center',
+          lineWidth: 0.3,
+          lineColor: [0, 51, 102],
         },
         bodyStyles: {
           fontSize: 9,
-          textColor: 0
+          textColor: 0,
+          fontStyle: 'bold',
+          lineWidth: 0.2,
+          lineColor: [180, 180, 180],
+          cellPadding: 4,
         },
         columnStyles: {
-          0: { cellWidth: 100, fontStyle: 'bold' },
-          1: { cellWidth: 90, halign: 'right' }
+          0: { cellWidth: 52, halign: 'left' },
+          1: { cellWidth: 38, halign: 'right' },
+          2: { cellWidth: 52, halign: 'left' },
+          3: { cellWidth: 38, halign: 'right' },
         },
-        margin: { left: 10, right: 10 },
+        margin: { left: 15, right: 15 },
         didDrawPage: () => {
-          // Add border on each page
           doc.setDrawColor(0, 0, 0);
           doc.setLineWidth(0.5);
           doc.rect(5, 5, 200, 287);
-        }
+        },
       });
 
       yPos = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
