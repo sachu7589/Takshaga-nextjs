@@ -1226,7 +1226,6 @@ export default function ApprovedWorkDetailsPage() {
       if (estimate?.client) {
         doc.text(estimate.client.name, 110, 95);
         doc.text(estimate.client.location || "", 110, 105);
-        doc.text(estimate.client.phone || "", 110, 115);
       }
       
       // PAYMENT RECEIPT heading
@@ -1437,7 +1436,6 @@ export default function ApprovedWorkDetailsPage() {
       if (estimate?.client) {
         doc.text(estimate.client.name, 110, 95);
         doc.text(estimate.client.location || "", 110, 105);
-        doc.text(estimate.client.phone || "", 110, 115);
       }
       
       // PAYMENT RECEIPT heading
