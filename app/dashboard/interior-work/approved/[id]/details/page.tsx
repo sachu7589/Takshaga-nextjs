@@ -23,7 +23,7 @@ import {
 import Swal from 'sweetalert2';
 import type { SweetAlertOptions } from 'sweetalert2';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import autoTable, { type RowInput } from 'jspdf-autotable';
 import QRCode from 'qrcode';
 import { formatDateDDMMYYYY, formatDateForFileName } from '@/app/utils/dateFormat';
 
@@ -1514,7 +1514,7 @@ export default function ApprovedWorkDetailsPage() {
       autoTable(doc, {
         startY: yPos,
         head: [['Description', 'Amount', 'Description', 'Amount']],
-        body: tableBody,
+        body: tableBody as RowInput[],
         theme: 'grid',
         headStyles: {
           fillColor: [0, 51, 102],
