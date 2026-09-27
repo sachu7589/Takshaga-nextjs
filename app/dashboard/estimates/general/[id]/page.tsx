@@ -227,13 +227,14 @@ export default function GeneralEstimateViewPage() {
     doc.text(clientDetails.name, 110, 95);
     doc.text(clientDetails.location || "", 110, 105);
     
-    // Add ESTIMATE heading with professional styling
+    // Banner uses the estimate name entered by the user
+    const estimateTitle = (estimate.estimateName || "ESTIMATE").trim();
     doc.setFillColor(0, 51, 102);
     doc.rect(5, 130, 200, 12, 'F');
-    doc.setFontSize(14);
+    doc.setFontSize(estimateTitle.length > 36 ? 11 : 14);
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text("ESTIMATE", 105, 138, { align: "center" });
+    doc.text(estimateTitle, 105, 138, { align: "center" });
 
     let yPos = 150;
 
